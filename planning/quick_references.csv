@@ -1,0 +1,29 @@
+Investor Tab,Filter,Option Selected,Query / Function,Notes
+Individual,Any / None,Any combination,filter_dp_investor_menu(),Always the same function. Only parameters change.
+Individual,No filter,—,"filter_dp_investor_menu(...null,null,null...)",All filter params passed as null.
+Individual,Eligibility,YES,eligibility = 'YES',Second param
+Individual,Eligibility,NO,eligibility = 'NO',Second param
+Individual,OTM,Yes,otm = 'Y',Third param
+Individual,OTM,No,otm = 'NOT_AVAILABLE',Third param
+Individual,Investor Type,Active,investortype = 'ACTIVE',Fourth param. Last txn within 180 days.
+Individual,Investor Type,Dormant,investortype = 'DORMANT',Fourth param. Last txn 180+ days ago.
+Individual,Investor Subtype,CGF,investorsubtype = ARRAY['CGF'],Fifth param
+Individual,Investor Subtype,Minor,investorsubtype = ARRAY['MINOR'],Fifth param. Uses tax_status minor_flag.
+Individual,Investor Subtype,Others,investorsubtype = ARRAY['OTHERS'],Fifth param. Not CGF and not Minor.
+Individual,Investor Subtype,CGF + Minor,"investorsubtype = ARRAY['CGF','MINOR']",Fifth param. Both passed together.
+Individual,Current Holding,With holdings,"holding = ROW('WITH',...)",Sixth param. Net units > 0.
+Individual,Current Holding,Without holdings,"holding = ROW('WITHOUT',...)",Sixth param. Net units = 0.
+Individual,Systematic,With SIP/STP/SWP etc.,"systematic = ROW('WITH', ARRAY['SIP',...],...)","Seventh param. Checks SIPSTP, DTP_REGN, TRIGGER_TRXN."
+Individual,Systematic,Without plans,"systematic = ROW('WITHOUT', ARRAY['SIP',...],...)",Seventh param.
+Individual,Investor Activity,With purchase/redemption etc.,"activity = ROW('WITH', ARRAY['PURCHASE',...],...,'1 month')",Eighth param. Checks processed_trxns.
+Individual,Name search,Name typed,searchtext = 'name',Ninth param. ILIKE on first_name.
+Non-Individual,No filter,—,Default Non-Individual query,"Simple join, no extra WHERE."
+Non-Individual,OTM,Yes,With OTM - Yes query,WHERE EXISTS on multiple_bank.
+Non-Individual,OTM,No,With OTM - No query,WHERE NOT EXISTS on multiple_bank.
+Non-Individual,Investor Type,Active,With Active Investor Type Filter query,Last txn <= 180 days in customer_schemes.
+Non-Individual,Investor Type,Dormant,With Dormant Investor Type Filter query,Last txn >= 180 days in customer_schemes.
+Non-Individual,Investor Subtype,CGF,With CGF Investor Subtype query,cgf_flag = C in scheme_setup.
+Non-Individual,Investor Subtype,Minor,With Minor Investor Subtype query,inv_type 02 or 26 in customer_master.
+Non-Individual,Investor Subtype,CGF + Minor,With Minor and CGF query,OR condition combining both.
+Non-Individual,Investor Subtype,Others,With Others Investor Subtype query,NOT CGF AND NOT Minor.
+Non-Individual,Combinations,Any two filters together,"Run each query separately, intersect results",No combined queries exist in document for NI.

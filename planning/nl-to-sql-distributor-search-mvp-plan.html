@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NL-to-SQL Search Plan - Mutual Fund Distributor Portal</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-alt: #eef3fb;
+      --text: #172033;
+      --muted: #5f6c80;
+      --accent: #2457c5;
+      --accent-soft: #e7efff;
+      --border: #d9e1ef;
+      --success: #16794c;
+      --warning: #936300;
+      --danger: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+
+    header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px;
+      margin-bottom: 22px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 32px;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-bottom: 14px;
+      color: var(--accent);
+    }
+
+    h3 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .subtitle {
+      max-width: 850px;
+      font-size: 16px;
+      margin-top: 12px;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px;
+      margin-top: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      background: var(--surface-alt);
+    }
+
+    .card p {
+      font-size: 14px;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-top: 14px;
+    }
+
+    .callout strong {
+      color: var(--text);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--border);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--surface-alt);
+      color: var(--text);
+    }
+
+    ul,
+    ol {
+      margin: 10px 0 0;
+      padding-left: 22px;
+      color: var(--muted);
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .flow {
+      overflow-x: auto;
+      white-space: pre;
+      background: #101828;
+      color: #eef4ff;
+      border-radius: 14px;
+      padding: 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.45;
+      margin-top: 12px;
+    }
+
+    .status {
+      font-weight: 700;
+    }
+
+    .success {
+      color: var(--success);
+    }
+
+    .warning {
+      color: var(--warning);
+    }
+
+    .danger {
+      color: var(--danger);
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .phase {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      background: var(--surface-alt);
+    }
+
+    .phase-label {
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 18px;
+    }
+
+    .diagram-shell {
+      margin-top: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #ffffff;
+      overflow-x: auto;
+      padding: 12px;
+    }
+
+    .architecture-svg {
+      display: block;
+      min-width: 1120px;
+      width: 100%;
+      height: auto;
+    }
+
+    .diagram-title {
+      font-size: 18px;
+      font-weight: 800;
+      fill: #172033;
+    }
+
+    .diagram-subtitle {
+      font-size: 12px;
+      fill: #5f6c80;
+    }
+
+    .zone {
+      fill: #f8fbff;
+      stroke: #c7d4e8;
+      stroke-width: 1.5;
+      rx: 16;
+    }
+
+    .zone-label {
+      font-size: 13px;
+      font-weight: 800;
+      fill: #2457c5;
+      letter-spacing: 0.03em;
+    }
+
+    .node {
+      fill: #ffffff;
+      stroke: #8aa6d9;
+      stroke-width: 1.6;
+      rx: 10;
+    }
+
+    .node-strong {
+      fill: #e7efff;
+      stroke: #2457c5;
+      stroke-width: 2;
+      rx: 10;
+    }
+
+    .node-safe {
+      fill: #ecfdf5;
+      stroke: #16794c;
+      stroke-width: 1.6;
+      rx: 10;
+    }
+
+    .node-warn {
+      fill: #fff7df;
+      stroke: #936300;
+      stroke-width: 1.6;
+      rx: 10;
+    }
+
+    .node-danger {
+      fill: #fff1f0;
+      stroke: #b42318;
+      stroke-width: 1.6;
+      rx: 10;
+    }
+
+    .node-store {
+      fill: #f5f7fb;
+      stroke: #6b7890;
+      stroke-width: 1.6;
+      rx: 10;
+    }
+
+    .node-title {
+      font-size: 13px;
+      font-weight: 800;
+      fill: #172033;
+    }
+
+    .node-text {
+      font-size: 11px;
+      fill: #5f6c80;
+    }
+
+    .edge {
+      stroke: #52627a;
+      stroke-width: 1.7;
+      fill: none;
+      marker-end: url(#arrow);
+    }
+
+    .edge-safe {
+      stroke: #16794c;
+      stroke-width: 1.8;
+      fill: none;
+      marker-end: url(#arrow-safe);
+    }
+
+    .edge-warn {
+      stroke: #936300;
+      stroke-width: 1.8;
+      fill: none;
+      marker-end: url(#arrow-warn);
+      stroke-dasharray: 6 4;
+    }
+
+    .edge-label-bg {
+      fill: #ffffff;
+      stroke: #d9e1ef;
+      stroke-width: 1;
+      rx: 8;
+    }
+
+    .edge-label {
+      font-size: 10.5px;
+      fill: #364154;
+      font-weight: 700;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .legend-swatch {
+      width: 24px;
+      height: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+    }
+
+    .swatch-strong {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+
+    .swatch-safe {
+      background: #ecfdf5;
+      border-color: var(--success);
+    }
+
+    .swatch-warn {
+      background: #fff7df;
+      border-color: var(--warning);
+    }
+
+    .swatch-danger {
+      background: #fff1f0;
+      border-color: var(--danger);
+    }
+
+    @media (max-width: 680px) {
+      .phase {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>NL-to-SQL Search Plan</h1>
+      <p class="subtitle">
+        Plan for a Mutual Fund Distributor Portal natural-language input box that converts distributor queries into safe, read-only SQL over approved PostgreSQL views while keeping model execution and data fully inside the data centre.
+      </p>
+      <div class="badge-row">
+        <span class="badge">Read-only MVP API</span>
+        <span class="badge">Approved views only</span>
+        <span class="badge">Distributor-scoped results</span>
+        <span class="badge">3 core query families</span>
+        <span class="badge">SELECT-only SQL</span>
+        <span class="badge">Basic audit logs</span>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2>Executive Summary</h2>
+      <p>
+        Build a small distributor search MVP that accepts natural-language business queries, maps them to a few approved read-only query patterns, applies mandatory distributor authorization, and returns paginated results with interpreted filters and simple confidence or ambiguity warnings.
+      </p>
+      <div class="callout">
+        <strong>Simplified MVP approach:</strong> start with a narrow query-plan contract and deterministic SQL templates. Avoid broad free-form NL-to-SQL until the first query families are validated with users.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Scope Boundaries</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>In Scope</h3>
+          <ul>
+            <li><strong>Investor discovery:</strong> find investors by name, city, state, KYC status, and risk profile.</li>
+            <li><strong>Investment amount search:</strong> find investors by total investment value and fund category.</li>
+            <li><strong>SIP status search:</strong> find investors by SIP status like active, ceased, expired, or no active SIP.</li>
+            <li>Read-only execution against approved distributor-safe views with mandatory distributor scope.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Out of Scope </h3>
+          <ul>
+            <li>Transaction-level purchase/redemption analytics and complex time-series comparisons.</li>
+            <li>Advanced scheme inclusion/exclusion logic.</li>
+            <li>Complex column/table/scheme inclusion/exclusion logic.</li>
+            <li>Contact-field search, SQL visibility toggles, admin/global analytics, and custom report generation.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Target Architecture</h2>
+      <p>
+        Architecture view for the simple MVP. The search service runs as one backend API,
+        calls only an approved model endpoint for a structured query plan, generates SQL from fixed templates,
+        and executes against approved distributor-safe views with mandatory authorization scope.
+      </p>
+      <div class="diagram-shell" aria-label="Detailed NL-to-SQL distributor search architecture diagram">
+        <svg class="architecture-svg" viewBox="0 0 1180 920" role="img">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#52627a"></path>
+            </marker>
+            <marker id="arrow-safe" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#16794c"></path>
+            </marker>
+            <marker id="arrow-warn" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#936300"></path>
+            </marker>
+          </defs>
+
+          <text x="24" y="34" class="diagram-title">NL-to-SQL Distributor Search  Architecture</text>
+          <text x="24" y="55" class="diagram-subtitle">Simple read-only search path, approved PostgreSQL views, distributor-scoped SELECT queries, and basic audit logs</text>
+
+          <rect x="20" y="82" width="200" height="480" class="zone"></rect>
+          <text x="36" y="108" class="zone-label">DISTRIBUTOR PORTAL</text>
+
+          <rect x="250" y="82" width="350" height="480" class="zone"></rect>
+          <text x="266" y="108" class="zone-label">APPLICATION SERVICES</text>
+
+          <rect x="630" y="82" width="260" height="480" class="zone"></rect>
+          <text x="646" y="108" class="zone-label">SAFE QUERY ENGINE</text>
+
+          <rect x="920" y="82" width="230" height="480" class="zone"></rect>
+          <text x="936" y="108" class="zone-label">DATA CENTRE</text>
+
+          <rect x="42" y="148" width="150" height="86" class="node-strong"></rect>
+          <text x="58" y="172" class="node-title">1. Search UI</text>
+          <text x="58" y="192" class="node-text">NL query box</text>
+          <text x="58" y="208" class="node-text">simple filters</text>
+          <text x="58" y="224" class="node-text">results table</text>
+
+          <rect x="275" y="148" width="138" height="86" class="node-strong"></rect>
+          <text x="291" y="172" class="node-title">2. Search API</text>
+          <text x="291" y="192" class="node-text">POST /query</text>
+          <text x="291" y="208" class="node-text">health check</text>
+          <text x="291" y="224" class="node-text">POST /validate</text>
+
+          <rect x="438" y="148" width="138" height="86" class="node-safe"></rect>
+          <text x="454" y="172" class="node-title">3. Auth Scope</text>
+          <text x="454" y="192" class="node-text">distributor_id</text>
+          <text x="454" y="208" class="node-text">mapped investors</text>
+          <text x="454" y="224" class="node-text">field visibility</text>
+
+          <rect x="438" y="258" width="138" height="92" class="node-danger"></rect>
+          <text x="454" y="282" class="node-title">4. Input Guard</text>
+          <text x="454" y="302" class="node-text">prompt injection</text>
+          <text x="454" y="318" class="node-text">other account asks</text>
+          <text x="454" y="334" class="node-text">PII overreach</text>
+
+          <rect x="650" y="148" width="102" height="86" class="node"></rect>
+          <text x="666" y="172" class="node-title">5. Parse</text>
+          <text x="666" y="192" class="node-text">dates/FY</text>
+          <text x="666" y="208" class="node-text">lakh/crore</text>
+          <text x="666" y="224" class="node-text">synonyms</text>
+
+          <rect x="770" y="148" width="102" height="86" class="node-warn"></rect>
+          <text x="786" y="172" class="node-title">6. Plan</text>
+          <text x="786" y="192" class="node-text">internal LLM</text>
+          <text x="786" y="208" class="node-text">JSON only</text>
+          <text x="786" y="224" class="node-text">confidence</text>
+
+          <rect x="650" y="306" width="102" height="92" class="node-safe"></rect>
+          <text x="666" y="330" class="node-title">7. Validate</text>
+          <text x="666" y="350" class="node-text">allowed views</text>
+          <text x="666" y="366" class="node-text">SELECT-only</text>
+          <text x="666" y="382" class="node-text">scope required</text>
+
+          <rect x="770" y="306" width="102" height="92" class="node-safe"></rect>
+          <text x="786" y="330" class="node-title">8. Build SQL</text>
+          <text x="786" y="350" class="node-text">parameters</text>
+          <text x="786" y="366" class="node-text">pagination</text>
+          <text x="786" y="382" class="node-text">redacted copy</text>
+
+          <rect x="950" y="148" width="150" height="86" class="node-store"></rect>
+          <text x="966" y="172" class="node-title">Schema Registry</text>
+          <text x="966" y="192" class="node-text">approved views</text>
+          <text x="966" y="208" class="node-text">allowed columns</text>
+          <text x="966" y="224" class="node-text">filter mappings</text>
+
+          <rect x="950" y="306" width="150" height="92" class="node-safe"></rect>
+          <text x="966" y="330" class="node-title">9. Client Provided Views</text>
+          <text x="966" y="350" class="node-text">read-only role</text>
+          <text x="966" y="366" class="node-text">client views only</text>
+          <text x="966" y="382" class="node-text">timeout + limit</text>
+
+          <rect x="650" y="430" width="222" height="84" class="node-danger"></rect>
+          <text x="666" y="454" class="node-title">10. Output Guard</text>
+          <text x="666" y="474" class="node-text">remove unauthorized fields</text>
+          <text x="666" y="490" class="node-text">mask PAN/mobile/email</text>
+          <text x="666" y="506" class="node-text">redact SQL literals</text>
+
+          <rect x="438" y="430" width="138" height="84" class="node"></rect>
+          <text x="454" y="454" class="node-title">11. Response</text>
+          <text x="454" y="474" class="node-text">rows + metadata</text>
+          <text x="454" y="490" class="node-text">filters + warnings</text>
+          <text x="454" y="506" class="node-text">safe SQL view</text>
+
+          <rect x="275" y="430" width="138" height="84" class="node-store"></rect>
+          <text x="291" y="454" class="node-title">Basic Audit Log</text>
+          <text x="291" y="474" class="node-text">query + filters</text>
+          <text x="291" y="490" class="node-text">risk reason</text>
+          <text x="291" y="506" class="node-text">SQL fingerprint</text>
+
+          <rect x="42" y="430" width="150" height="84" class="node"></rect>
+          <text x="58" y="454" class="node-title">12. Results View</text>
+          <text x="58" y="474" class="node-text">paginated rows</text>
+          <text x="58" y="490" class="node-text">interpreted intent</text>
+          <text x="58" y="506" class="node-text">safe SQL toggle</text>
+
+          <rect x="275" y="258" width="138" height="92" class="node-danger"></rect>
+          <text x="291" y="282" class="node-title">Blocked / Clarify</text>
+          <text x="291" y="302" class="node-text">access denied</text>
+          <text x="291" y="318" class="node-text">ambiguous request</text>
+          <text x="291" y="334" class="node-text">suspicious intent</text>
+
+          <path d="M192 191 L275 191" class="edge"></path>
+          <rect x="208" y="164" width="48" height="22" class="edge-label-bg"></rect>
+          <text x="217" y="179" class="edge-label">query</text>
+
+          <path d="M413 191 L438 191" class="edge-safe"></path>
+          <path d="M507 234 L507 258" class="edge-safe"></path>
+          <path d="M576 304 L610 304 L610 191 L650 191" class="edge-safe"></path>
+          <rect x="590" y="164" width="44" height="22" class="edge-label-bg"></rect>
+          <text x="599" y="179" class="edge-label">scope</text>
+
+          <path d="M438 304 L413 304" class="edge-warn"></path>
+          <rect x="414" y="276" width="48" height="22" class="edge-label-bg"></rect>
+          <text x="422" y="291" class="edge-label">block</text>
+
+          <path d="M752 191 L770 191" class="edge-warn"></path>
+          <path d="M821 234 L821 306" class="edge-warn"></path>
+          <rect x="832" y="258" width="72" height="22" class="edge-label-bg"></rect>
+          <text x="840" y="273" class="edge-label">JSON plan</text>
+
+          <path d="M770 352 L752 352" class="edge-safe"></path>
+          <path d="M701 306 L701 234" class="edge-safe"></path>
+          <rect x="626" y="258" width="64" height="22" class="edge-label-bg"></rect>
+          <text x="635" y="273" class="edge-label">validated</text>
+
+          <path d="M701 398 L701 430 L821 430 L821 398" class="edge-safe"></path>
+          <rect x="735" y="410" width="52" height="22" class="edge-label-bg"></rect>
+          <text x="744" y="425" class="edge-label">safe plan</text>
+
+          <path d="M872 352 L950 352" class="edge-safe"></path>
+          <rect x="884" y="325" width="54" height="22" class="edge-label-bg"></rect>
+          <text x="893" y="340" class="edge-label">SQL + params</text>
+
+          <path d="M1025 234 L1025 306" class="edge-safe"></path>
+          <rect x="1036" y="258" width="56" height="22" class="edge-label-bg"></rect>
+          <text x="1044" y="273" class="edge-label">view rules</text>
+
+          <path d="M950 191 L872 191" class="edge-safe"></path>
+          <rect x="886" y="164" width="50" height="22" class="edge-label-bg"></rect>
+          <text x="895" y="179" class="edge-label">schema</text>
+
+          <path d="M950 352 L872 352" class="edge-safe"></path>
+          <rect x="892" y="370" width="38" height="22" class="edge-label-bg"></rect>
+          <text x="900" y="385" class="edge-label">rows</text>
+
+          <path d="M821 398 L821 430" class="edge-safe"></path>
+          <path d="M650 472 L576 472" class="edge"></path>
+          <rect x="624" y="370" width="98" height="22" class="edge-label-bg"></rect>
+          <text x="632" y="385" class="edge-label">rows + SQL meta</text>
+
+          <path d="M438 472 L413 472" class="edge"></path>
+          <path d="M275 472 L192 472" class="edge"></path>
+          <rect x="210" y="325" width="48" height="22" class="edge-label-bg"></rect>
+          <text x="218" y="340" class="edge-label">display</text>
+
+          <path d="M438 495 L413 495" class="edge"></path>
+          <path d="M344 350 L344 430" class="edge-warn"></path>
+          <rect x="414" y="510" width="36" height="22" class="edge-label-bg"></rect>
+          <text x="422" y="525" class="edge-label">audit</text>
+
+          <rect x="24" y="590" width="1126" height="118" class="zone"></rect>
+          <text x="44" y="616" class="zone-label">GUARDRAILS AGAINST PROMPT INJECTION AND UNAUTHORIZED ACCOUNT ACCESS</text>
+          <text x="44" y="642" class="node-text">1. Input Guard blocks or clarifies: ignore previous instructions, reveal SQL/schema, bypass access, show another distributor/account, export all investors, or expose full PAN/mobile/email.</text>
+          <text x="44" y="664" class="node-text">2. Auth Scope and Policy Validator enforce distributor mapping independently of model output; the model cannot grant access or remove the distributor predicate.</text>
+          <text x="44" y="686" class="node-text">3. Output Guard masks sensitive fields, hides raw SQL by default, and logs suspicious blocked attempts for review.</text>
+
+          <rect x="24" y="732" width="1126" height="112" class="zone"></rect>
+          <text x="44" y="758" class="zone-label">NON-NEGOTIABLE  SAFETY RULES</text>
+          <text x="44" y="784" class="node-text">A. No external AI API: model, prompts, schema, SQL, and investor data stay inside the data centre.</text>
+          <text x="44" y="806" class="node-text">B. The model returns JSON plan only; server-side registry, guards, and policy decide what can execute.</text>
+          <text x="44" y="828" class="node-text">C. Every query is SELECT-only, parameterized, paginated, timed out, logged, masked, and scoped to the authenticated distributor.</text>
+        </svg>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-swatch swatch-strong"></span> User/API interaction component</div>
+        <div class="legend-item"><span class="legend-swatch swatch-safe"></span> Security-critical enforcement component</div>
+        <div class="legend-item"><span class="legend-swatch swatch-danger"></span> Prompt-injection, access, and PII guardrail component</div>
+        <div class="legend-item"><span class="legend-swatch swatch-warn"></span> Internal AI boundary; JSON plan only</div>
+        <div class="legend-item"><span class="legend-swatch"></span> Data/config/audit component</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>AWS Deployment Infrastructure</h2>
+      <p>
+        Infra-level deployment view for the simple MVP. The solution can be Dockerized, pushed to Amazon ECR,
+        and deployed on ECS Fargate behind an ALB. The same Search API container calls AWS LLM models
+        and accesses client-provided database views through a read-only private connection.
+      </p>
+      <div class="diagram-shell" aria-label="AWS deployment infrastructure diagram for NL-to-SQL distributor search">
+        <svg class="architecture-svg" viewBox="0 0 1180 620" role="img">
+          <defs>
+            <marker id="-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#52627a"></path>
+            </marker>
+            <marker id="-arrow-safe" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#16794c"></path>
+            </marker>
+          </defs>
+
+          <text x="24" y="34" class="diagram-title">Simple MVP AWS Deployment - Dockerized NL-to-SQL Search</text>
+          <text x="24" y="55" class="diagram-subtitle">Minimal deployable architecture: one Search API container, AWS LLM model call, schema rules, and client-provided PostgreSQL views</text>
+
+          <rect x="24" y="82" width="1132" height="410" class="zone"></rect>
+          <text x="42" y="108" class="zone-label">AWS ACCOUNT / REGION</text>
+
+          <rect x="48" y="132" width="190" height="300" class="zone"></rect>
+          <text x="64" y="158" class="zone-label">PUBLIC ENTRY</text>
+
+          <rect x="270" y="132" width="560" height="300" class="zone"></rect>
+          <text x="286" y="158" class="zone-label">PRIVATE APP SUBNETS</text>
+
+          <rect x="862" y="132" width="250" height="300" class="zone"></rect>
+          <text x="880" y="158" class="zone-label">PRIVATE DATA SUBNET</text>
+
+          <rect x="72" y="194" width="140" height="82" class="node-strong"></rect>
+          <text x="90" y="220" class="node-title">Distributor Portal</text>
+          <text x="90" y="242" class="node-text">browser / portal UI</text>
+          <text x="90" y="258" class="node-text">authenticated user</text>
+
+          <rect x="72" y="326" width="140" height="82" class="node-strong"></rect>
+          <image href="aws-icons/elastic-load-balancing.svg" x="88" y="340" width="44" height="44"></image>
+          <text x="140" y="352" class="node-title">ALB</text>
+          <text x="140" y="374" class="node-text">HTTPS</text>
+          <text x="140" y="390" class="node-text">routes to ECS</text>
+
+          <rect x="304" y="182" width="168" height="92" class="node-store"></rect>
+          <image href="aws-icons/amazon-ecr.svg" x="320" y="198" width="46" height="46"></image>
+          <text x="374" y="210" class="node-title">Amazon ECR</text>
+          <text x="374" y="232" class="node-text">Docker image</text>
+          <text x="374" y="248" class="node-text">Search API build</text>
+
+          <rect x="304" y="326" width="168" height="96" class="node-safe"></rect>
+          <image href="aws-icons/aws-fargate.svg" x="320" y="344" width="46" height="46"></image>
+          <text x="374" y="356" class="node-title">ECS Fargate</text>
+          <text x="374" y="378" class="node-text">Search API</text>
+          <text x="374" y="394" class="node-text">guards + SQL builder</text>
+          <text x="374" y="410" class="node-text">bundled schema config</text>
+
+          <rect x="548" y="326" width="168" height="96" class="node-warn"></rect>
+          <text x="568" y="354" class="node-title">AWS LLM Models</text>
+          <text x="568" y="376" class="node-text">Bedrock or approved</text>
+          <text x="568" y="392" class="node-text">AWS model endpoint</text>
+          <text x="568" y="408" class="node-text">JSON plan only</text>
+
+          <rect x="890" y="250" width="194" height="104" class="node-safe"></rect>
+          <image href="aws-icons/amazon-aurora.svg" x="908" y="272" width="48" height="48"></image>
+          <text x="968" y="280" class="node-title">Client PostgreSQL</text>
+          <text x="968" y="302" class="node-text">client-provided views</text>
+          <text x="968" y="318" class="node-text">read-only DB role</text>
+          <text x="968" y="334" class="node-text">private endpoint</text>
+
+          <path d="M142 276 L142 326" class="edge-safe" marker-end="url(#-arrow-safe)"></path>
+          <path d="M212 367 L304 374" class="edge-safe" marker-end="url(#-arrow-safe)"></path>
+          <rect x="226" y="342" width="58" height="22" class="edge-label-bg"></rect>
+          <text x="234" y="357" class="edge-label">HTTPS</text>
+
+          <path d="M304 392 L212 392" class="edge" marker-end="url(#-arrow)"></path>
+          <rect x="226" y="398" width="68" height="22" class="edge-label-bg"></rect>
+          <text x="234" y="413" class="edge-label">response</text>
+
+          <path d="M388 274 L388 326" class="edge" marker-end="url(#-arrow)"></path>
+          <rect x="402" y="290" width="42" height="22" class="edge-label-bg"></rect>
+          <text x="410" y="305" class="edge-label">pull</text>
+
+          <path d="M472 374 L548 374" class="edge" marker-end="url(#-arrow)"></path>
+          <rect x="488" y="347" width="42" height="22" class="edge-label-bg"></rect>
+          <text x="496" y="362" class="edge-label">prompt</text>
+
+          <path d="M548 396 L472 396" class="edge" marker-end="url(#-arrow)"></path>
+          <rect x="488" y="402" width="72" height="22" class="edge-label-bg"></rect>
+          <text x="496" y="417" class="edge-label">JSON plan</text>
+
+          <path d="M716 374 L890 302" class="edge-safe" marker-end="url(#-arrow-safe)"></path>
+          <rect x="760" y="318" width="92" height="22" class="edge-label-bg"></rect>
+          <text x="768" y="333" class="edge-label">SELECT + rows</text>
+
+          <rect x="48" y="510" width="1080" height="74" class="zone"></rect>
+          <text x="68" y="536" class="zone-label"> DEPLOYMENT NOTES</text>
+          <text x="68" y="562" class="node-text">1. Dockerize only the Search API and push it to Amazon ECR. Run one ECS Fargate service behind an ALB.</text>
+          <text x="68" y="582" class="node-text">2. The Search API calls AWS LLM models for JSON planning, validates the plan, then executes read-only SQL on client-provided views.</text>
+        </svg>
+        <svg class="architecture-svg" style="display:none" viewBox="0 0 1180 820" role="img">
+          <defs>
+            <marker id="clean-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#52627a"></path>
+            </marker>
+            <marker id="clean-arrow-safe" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#16794c"></path>
+            </marker>
+            <marker id="clean-arrow-warn" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#936300"></path>
+            </marker>
+          </defs>
+
+          <text x="24" y="34" class="diagram-title">AWS Infra Deployment - NL-to-SQL Distributor Search </text>
+          <text x="24" y="55" class="diagram-subtitle">Clean lane view with official AWS service icons and non-overlapping request, data, and audit paths</text>
+
+          <rect x="24" y="82" width="1132" height="590" class="zone"></rect>
+          <text x="42" y="108" class="zone-label">AWS ACCOUNT / REGION</text>
+
+          <rect x="48" y="132" width="190" height="430" class="zone"></rect>
+          <text x="64" y="158" class="zone-label">PUBLIC EDGE</text>
+
+          <rect x="270" y="132" width="500" height="430" class="zone"></rect>
+          <text x="286" y="158" class="zone-label">VPC - PRIVATE APP SUBNETS</text>
+
+          <rect x="806" y="132" width="324" height="430" class="zone"></rect>
+          <text x="824" y="158" class="zone-label">PRIVATE DATA SUBNETS</text>
+
+          <rect x="72" y="176" width="140" height="78" class="node-strong"></rect>
+          <text x="90" y="202" class="node-title">Distributor Portal</text>
+          <text x="90" y="224" class="node-text">browser / app</text>
+          <text x="90" y="240" class="node-text">authenticated user</text>
+
+          <rect x="72" y="300" width="140" height="88" class="node-danger"></rect>
+          <image href="aws-icons/aws-waf.svg" x="88" y="314" width="44" height="44"></image>
+          <text x="140" y="326" class="node-title">AWS WAF</text>
+          <text x="140" y="348" class="node-text">rate limits</text>
+          <text x="140" y="364" class="node-text">attack rules</text>
+
+          <rect x="72" y="432" width="140" height="88" class="node-strong"></rect>
+          <image href="aws-icons/elastic-load-balancing.svg" x="88" y="446" width="44" height="44"></image>
+          <text x="140" y="458" class="node-title">ALB</text>
+          <text x="140" y="480" class="node-text">TLS edge</text>
+          <text x="140" y="496" class="node-text">target group</text>
+
+          <rect x="306" y="176" width="170" height="92" class="node-strong"></rect>
+          <image href="aws-icons/aws-fargate.svg" x="322" y="192" width="46" height="46"></image>
+          <text x="376" y="204" class="node-title">Portal Backend</text>
+          <text x="376" y="226" class="node-text">AWS Fargate</text>
+          <text x="376" y="242" class="node-text">auth context</text>
+          <text x="376" y="258" class="node-text">session identity</text>
+
+          <rect x="306" y="382" width="170" height="112" class="node-safe"></rect>
+          <image href="aws-icons/aws-fargate.svg" x="322" y="402" width="46" height="46"></image>
+          <text x="376" y="410" class="node-title">Search API</text>
+          <text x="376" y="432" class="node-text">guardrails</text>
+          <text x="376" y="448" class="node-text">planner</text>
+          <text x="376" y="464" class="node-text">SQL builder</text>
+          <text x="376" y="480" class="node-text">pagination</text>
+
+          <rect x="548" y="176" width="172" height="92" class="node-warn"></rect>
+          <image href="aws-icons/amazon-sagemaker.svg" x="564" y="192" width="46" height="46"></image>
+          <text x="618" y="204" class="node-title">Amazon SageMaker</text>
+          <text x="618" y="226" class="node-text">internal LLM</text>
+          <text x="618" y="242" class="node-text">private endpoint</text>
+          <text x="618" y="258" class="node-text">JSON plan only</text>
+
+          <rect x="548" y="300" width="172" height="88" class="node-store"></rect>
+          <text x="566" y="326" class="node-title">Schema Registry</text>
+          <text x="566" y="348" class="node-text">client views / columns</text>
+          <text x="566" y="364" class="node-text">operators / synonyms</text>
+
+          <rect x="548" y="432" width="172" height="88" class="node-store"></rect>
+          <image href="aws-icons/cloudwatch.svg" x="564" y="446" width="44" height="44"></image>
+          <text x="616" y="458" class="node-title">CloudWatch</text>
+          <text x="616" y="480" class="node-text">logs / metrics</text>
+          <text x="616" y="496" class="node-text">alarms</text>
+
+          <rect x="306" y="526" width="170" height="78" class="node-store"></rect>
+          <image href="aws-icons/secrets-manager.svg" x="322" y="538" width="44" height="44"></image>
+          <text x="376" y="550" class="node-title">Secrets Manager</text>
+          <text x="376" y="572" class="node-text">DB creds / config</text>
+          <text x="376" y="588" class="node-text">rotation</text>
+
+          <rect x="850" y="176" width="210" height="96" class="node-safe"></rect>
+          <image href="aws-icons/amazon-aurora.svg" x="868" y="194" width="48" height="48"></image>
+          <text x="928" y="204" class="node-title">Amazon Aurora PostgreSQL</text>
+          <text x="928" y="226" class="node-text">client provided views</text>
+          <text x="928" y="242" class="node-text">read-only role</text>
+          <text x="928" y="258" class="node-text">private endpoint</text>
+
+          <rect x="850" y="324" width="210" height="88" class="node-store"></rect>
+          <image href="aws-icons/elasticache.svg" x="868" y="340" width="46" height="46"></image>
+          <text x="928" y="350" class="node-title">Amazon ElastiCache</text>
+          <text x="928" y="372" class="node-text">optional Redis cache</text>
+          <text x="928" y="388" class="node-text">short TTL only</text>
+
+          <rect x="850" y="472" width="210" height="88" class="node-store"></rect>
+          <image href="aws-icons/amazon-s3.svg" x="868" y="488" width="46" height="46"></image>
+          <text x="928" y="498" class="node-title">Amazon S3 Audit Store</text>
+          <text x="928" y="520" class="node-text">redacted audit logs</text>
+          <text x="928" y="536" class="node-text">retention policy</text>
+
+          <path d="M142 254 L142 300" class="edge-warn" marker-end="url(#clean-arrow-warn)"></path>
+          <path d="M142 388 L142 432" class="edge-safe" marker-end="url(#clean-arrow-safe)"></path>
+          <path d="M212 476 L306 438" class="edge-safe" marker-end="url(#clean-arrow-safe)"></path>
+          <rect x="226" y="430" width="58" height="22" class="edge-label-bg"></rect>
+          <text x="234" y="445" class="edge-label">HTTPS</text>
+
+          <path d="M476 438 L548 222" class="edge-warn" marker-end="url(#clean-arrow-warn)"></path>
+          <rect x="488" y="304" width="76" height="22" class="edge-label-bg"></rect>
+          <text x="496" y="319" class="edge-label">JSON plan</text>
+
+          <path d="M476 438 L548 344" class="edge-safe" marker-end="url(#clean-arrow-safe)"></path>
+          <rect x="488" y="370" width="72" height="22" class="edge-label-bg"></rect>
+          <text x="496" y="385" class="edge-label">view rules</text>
+
+          <path d="M476 438 L850 224" class="edge-safe" marker-end="url(#clean-arrow-safe)"></path>
+          <rect x="626" y="304" width="92" height="22" class="edge-label-bg"></rect>
+          <text x="634" y="319" class="edge-label">SELECT + rows</text>
+
+          <path d="M476 464 L850 516" class="edge" marker-end="url(#clean-arrow)"></path>
+          <rect x="622" y="474" width="72" height="22" class="edge-label-bg"></rect>
+          <text x="630" y="489" class="edge-label">audit log</text>
+
+          <path d="M476 454 L548 476" class="edge" marker-end="url(#clean-arrow)"></path>
+          <path d="M476 565 L476 494" class="edge-safe" marker-end="url(#clean-arrow-safe)"></path>
+
+          <rect x="48" y="632" width="1080" height="112" class="zone"></rect>
+          <text x="68" y="658" class="zone-label">INFRA GUARDRAILS</text>
+          <text x="68" y="684" class="node-text">1. WAF and ALB are the only public-facing components. Search API, internal model, Aurora, Redis, and audit storage stay in private subnets.</text>
+          <text x="68" y="706" class="node-text">2. Search API security group is the only path to Aurora client-provided views; DB credentials are read-only and sourced from Secrets Manager.</text>
+          <text x="68" y="728" class="node-text">3. Internal model endpoint has no external AI egress. CloudWatch and S3 capture blocked prompts, cross-account attempts, redacted SQL, and execution metrics.</text>
+        </svg>
+        <svg class="architecture-svg" style="display:none" viewBox="0 0 1180 760" role="img">
+          <defs>
+            <marker id="infra-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#52627a"></path>
+            </marker>
+            <marker id="infra-arrow-safe" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#16794c"></path>
+            </marker>
+            <marker id="infra-arrow-warn" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L10,4 L0,8 Z" fill="#936300"></path>
+            </marker>
+          </defs>
+
+          <text x="24" y="34" class="diagram-title">AWS Infra Deployment - NL-to-SQL Distributor Search </text>
+          <text x="24" y="55" class="diagram-subtitle">Private model and database access, read-only execution path, audit logging, and controlled egress</text>
+
+          <rect x="24" y="82" width="1132" height="548" class="zone"></rect>
+          <text x="42" y="108" class="zone-label">AWS ACCOUNT / REGION</text>
+
+          <rect x="48" y="132" width="190" height="420" class="zone"></rect>
+          <text x="64" y="158" class="zone-label">PUBLIC EDGE</text>
+
+          <rect x="270" y="132" width="610" height="420" class="zone"></rect>
+          <text x="286" y="158" class="zone-label">VPC - PRIVATE APPLICATION SUBNETS</text>
+
+          <rect x="910" y="132" width="220" height="420" class="zone"></rect>
+          <text x="926" y="158" class="zone-label">PRIVATE DATA SUBNETS</text>
+
+          <rect x="74" y="194" width="138" height="76" class="node-strong"></rect>
+          <text x="90" y="218" class="node-title">Distributor Portal</text>
+          <text x="90" y="238" class="node-text">Browser / app</text>
+          <text x="90" y="254" class="node-text">Authenticated user</text>
+
+          <rect x="74" y="318" width="138" height="76" class="node-danger"></rect>
+          <image href="aws-icons/aws-waf.svg" x="86" y="330" width="34" height="34"></image>
+          <text x="126" y="342" class="node-title">AWS WAF</text>
+          <text x="126" y="362" class="node-text">rate limits</text>
+          <text x="126" y="378" class="node-text">attack rules</text>
+
+          <rect x="74" y="442" width="138" height="76" class="node-strong"></rect>
+          <image href="aws-icons/elastic-load-balancing.svg" x="86" y="454" width="34" height="34"></image>
+          <text x="126" y="466" class="node-title">ALB Edge</text>
+          <text x="126" y="486" class="node-text">TLS</text>
+          <text x="126" y="502" class="node-text">targets</text>
+
+          <rect x="300" y="184" width="156" height="88" class="node-strong"></rect>
+          <image href="aws-icons/aws-fargate.svg" x="312" y="198" width="34" height="34"></image>
+          <text x="352" y="208" class="node-title">Portal Backend</text>
+          <text x="352" y="228" class="node-text">ECS/Fargate</text>
+          <text x="352" y="244" class="node-text">auth context</text>
+          <text x="352" y="260" class="node-text">identity</text>
+
+          <rect x="300" y="328" width="156" height="98" class="node-safe"></rect>
+          <image href="aws-icons/aws-fargate.svg" x="312" y="342" width="34" height="34"></image>
+          <text x="352" y="352" class="node-title">Search API</text>
+          <text x="352" y="372" class="node-text">guards</text>
+          <text x="352" y="388" class="node-text">planner</text>
+          <text x="352" y="404" class="node-text">SQL builder</text>
+          <text x="352" y="420" class="node-text">pagination</text>
+
+          <rect x="520" y="184" width="146" height="88" class="node-warn"></rect>
+          <image href="aws-icons/amazon-sagemaker.svg" x="532" y="198" width="34" height="34"></image>
+          <text x="572" y="208" class="node-title">Internal LLM</text>
+          <text x="572" y="228" class="node-text">SageMaker</text>
+          <text x="572" y="244" class="node-text">private API</text>
+          <text x="572" y="260" class="node-text">JSON only</text>
+
+          <rect x="520" y="328" width="146" height="98" class="node-store"></rect>
+          <text x="536" y="352" class="node-title">Schema Registry</text>
+          <text x="536" y="372" class="node-text">allowed views</text>
+          <text x="536" y="388" class="node-text">columns/operators</text>
+          <text x="536" y="404" class="node-text">synonyms/date rules</text>
+
+          <rect x="708" y="184" width="142" height="88" class="node-store"></rect>
+          <image href="aws-icons/secrets-manager.svg" x="720" y="198" width="34" height="34"></image>
+          <text x="760" y="208" class="node-title">Secrets</text>
+          <text x="760" y="228" class="node-text">DB creds</text>
+          <text x="760" y="244" class="node-text">model config</text>
+          <text x="760" y="260" class="node-text">rotation</text>
+
+          <rect x="708" y="328" width="142" height="98" class="node-store"></rect>
+          <image href="aws-icons/cloudwatch.svg" x="720" y="342" width="34" height="34"></image>
+          <text x="760" y="352" class="node-title">CloudWatch</text>
+          <text x="760" y="372" class="node-text">logs</text>
+          <text x="760" y="388" class="node-text">metrics</text>
+          <text x="760" y="404" class="node-text">blocked queries</text>
+          <text x="760" y="420" class="node-text">alarms</text>
+
+          <rect x="936" y="184" width="164" height="92" class="node-safe"></rect>
+          <image href="aws-icons/amazon-aurora.svg" x="948" y="198" width="34" height="34"></image>
+          <text x="988" y="208" class="node-title">Aurora PG</text>
+          <text x="988" y="228" class="node-text">private endpoint</text>
+          <text x="988" y="244" class="node-text">client views</text>
+          <text x="988" y="260" class="node-text">read-only role</text>
+
+          <rect x="936" y="326" width="164" height="86" class="node-store"></rect>
+          <image href="aws-icons/elasticache.svg" x="948" y="338" width="34" height="34"></image>
+          <text x="988" y="350" class="node-title">ElastiCache</text>
+          <text x="988" y="370" class="node-text">Redis cache</text>
+          <text x="988" y="386" class="node-text">short TTL</text>
+          <text x="988" y="402" class="node-text">private subnet</text>
+
+          <rect x="936" y="462" width="164" height="76" class="node-store"></rect>
+          <image href="aws-icons/amazon-s3.svg" x="948" y="474" width="34" height="34"></image>
+          <text x="988" y="486" class="node-title">Audit Store</text>
+          <text x="988" y="506" class="node-text">S3 / DB</text>
+          <text x="988" y="522" class="node-text">redacted logs</text>
+
+          <path d="M143 270 L143 318" class="edge-warn" marker-end="url(#infra-arrow-warn)"></path>
+          <path d="M143 394 L143 442" class="edge-safe" marker-end="url(#infra-arrow-safe)"></path>
+          <path d="M212 480 L300 377" class="edge-safe" marker-end="url(#infra-arrow-safe)"></path>
+          <rect x="222" y="410" width="64" height="22" class="edge-label-bg"></rect>
+          <text x="230" y="425" class="edge-label">HTTPS</text>
+
+          <path d="M456 377 L520 228" class="edge-warn" marker-end="url(#infra-arrow-warn)"></path>
+          <rect x="464" y="286" width="42" height="22" class="edge-label-bg"></rect>
+          <text x="472" y="301" class="edge-label">plan</text>
+
+          <path d="M456 377 L520 377" class="edge-safe" marker-end="url(#infra-arrow-safe)"></path>
+          <rect x="467" y="350" width="42" height="22" class="edge-label-bg"></rect>
+          <text x="475" y="365" class="edge-label">rules</text>
+
+          <path d="M666 377 L936 230" class="edge-safe" marker-end="url(#infra-arrow-safe)"></path>
+          <rect x="766" y="280" width="86" height="22" class="edge-label-bg"></rect>
+          <text x="774" y="295" class="edge-label">SELECT only</text>
+
+          <path d="M666 392 L936 500" class="edge" marker-end="url(#infra-arrow)"></path>
+          <rect x="767" y="426" width="72" height="22" class="edge-label-bg"></rect>
+          <text x="775" y="441" class="edge-label">audit event</text>
+
+          <path d="M708 228 L666 228" class="edge-safe" marker-end="url(#infra-arrow-safe)"></path>
+          <rect x="672" y="200" width="32" height="22" class="edge-label-bg"></rect>
+          <text x="680" y="215" class="edge-label">env</text>
+
+          <path d="M708 377 L666 392" class="edge" marker-end="url(#infra-arrow)"></path>
+          <path d="M456 398 L708 377" class="edge" marker-end="url(#infra-arrow)"></path>
+
+          <path d="M936 230 L666 354" class="edge-safe" marker-end="url(#infra-arrow-safe)"></path>
+          <rect x="780" y="316" width="42" height="22" class="edge-label-bg"></rect>
+          <text x="788" y="331" class="edge-label">rows</text>
+
+          <path d="M300 228 L212 480" class="edge" marker-end="url(#infra-arrow)"></path>
+          <rect x="220" y="306" width="52" height="22" class="edge-label-bg"></rect>
+          <text x="228" y="321" class="edge-label">results</text>
+
+          <rect x="48" y="596" width="1080" height="104" class="zone"></rect>
+          <text x="68" y="622" class="zone-label">INFRA GUARDRAILS</text>
+          <text x="68" y="648" class="node-text">1. App, model, Redis, and Aurora run in private subnets; Aurora security group accepts traffic only from the Search API service role/security group.</text>
+          <text x="68" y="670" class="node-text">2. NAT/egress is restricted; the internal model endpoint has no route to external AI APIs. Secrets are loaded from Secrets Manager, not embedded in code or prompts.</text>
+          <text x="68" y="692" class="node-text">3. WAF, ALB logs, application audit logs, CloudWatch metrics, and blocked-query events provide traceability for prompt-injection and cross-account attempts.</text>
+        </svg>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-swatch swatch-strong"></span> Public/API edge component</div>
+        <div class="legend-item"><span class="legend-swatch swatch-safe"></span> Private security-controlled execution or data component</div>
+        <div class="legend-item"><span class="legend-swatch swatch-danger"></span> Edge and request-protection layer</div>
+        <div class="legend-item"><span class="legend-swatch swatch-warn"></span> Internal model endpoint</div>
+        <div class="legend-item"><span class="legend-swatch"></span> Supporting infrastructure, logging, secrets, or audit component</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Simple MVP Costing Estimate</h2>
+      <p>
+        Approximate monthly cost range for the simplified NL-to-SQL MVP. This keeps sizing focused on early usage
+        and the minimal AWS application infrastructure needed to run one Dockerized Search API service.
+      </p>
+
+      <div class="callout">
+        <strong>Costing assumptions:</strong> 30-day month, around 2,000 input tokens and 500 output tokens
+        per search request, 100-1,000 requests per day, one ECS Fargate Search API service, ALB, and ECR. Existing client PostgreSQL/database
+        cost is not included. Figures are approximate USD ranges and should be validated against the final AWS region.
+      </div>
+
+      <h3>Complete Monthly Cost Range</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Requests / Day</th>
+            <th>Monthly Requests</th>
+            <th>Infra Assumption</th>
+            <th>Nova Micro</th>
+            <th>Nova Lite</th>
+            <th>Claude 3 Haiku</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>100</td>
+            <td>3,000</td>
+            <td>~$35 - $70</td>
+            <td>~$35 - $71</td>
+            <td>~$36 - $71</td>
+            <td>~$38 - $74</td>
+          </tr>
+          <tr>
+            <td>1,000</td>
+            <td>30,000</td>
+            <td>~$40 - $90</td>
+            <td>~$45 - $95</td>
+            <td>~$47 - $97</td>
+            <td>~$74 - $124</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Model Pricing Used</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Indicative Price / 1M Input Tokens</th>
+            <th>Indicative Price / 1M Output Tokens</th>
+            <th>Monthly Model-Only Cost at 1,000 Requests / Day</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Amazon Nova Micro</td>
+            <td>~$0.04</td>
+            <td>~$0.14</td>
+            <td>~$4.50</td>
+          </tr>
+          <tr>
+            <td>Amazon Nova Lite</td>
+            <td>~$0.06</td>
+            <td>~$0.24</td>
+            <td>~$7.20</td>
+          </tr>
+          <tr>
+            <td>Claude 3 Haiku on Bedrock</td>
+            <td>~$0.25</td>
+            <td>~$1.25</td>
+            <td>~$34</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>What Is Included / Excluded</h3>
+      <ul>
+        <li>Included in ranges: AWS LLM usage, one Dockerized Search API on ECS Fargate, ALB, ECR image storage, and light logs/metrics.</li>
+        <li>Excluded: existing client PostgreSQL cost, VPN/Direct Connect/private link setup, enterprise support, taxes, heavy observability retention, provisioned throughput commitments, and high-volume scale testing.</li>
+        <li>If prompt size doubles to around 4,000 input and 1,000 output tokens, model usage costs roughly double.</li>
+      </ul>
+
+      <div class="callout">
+        <strong>Recommended cost posture:</strong> use Nova Lite as the baseline for the simple MVP if quality is acceptable.
+        Use Claude 3 Haiku only if structured output quality is noticeably better during validation.
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

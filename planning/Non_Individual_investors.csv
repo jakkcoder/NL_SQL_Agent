@@ -1,0 +1,32 @@
+Natural Language Query,Filter Being Applied,Query to Run,Key Difference in Query
+Show me my investors / List all investors / No filter / Show everything,No filter - default load,Default Non-Individual query,Straight join on corporate_investor and distributor_investor_mapping. No extra WHERE conditions beyond ARN code and name search.
+Show investors with OTM / Who has mandate / Who has auto debit / OTM registered,OTM = Yes,With OTM - Yes query,"Default query but the inner join on distributor_investor_mapping gets WHERE EXISTS added:
+WHERE EXISTS (SELECT FROM sphmf.multiple_bank mb1
+WHERE dim1.folio_number=mb1.folio_no AND mb1.om_umrn is NOT null
+AND (mb1.cease_dt is null OR CEASE_DT < CURRENT_DATE)
+AND mb1.paymech in (select distinct pay_mech from payout_mechanism where otm_flag is true and active_flag is true))
+and dim1.arn_code=?"
+Show investors without OTM / Who has no mandate / No auto debit / OTM not registered,OTM = No,With OTM - No query,Same as OTM Yes but WHERE EXISTS changes to WHERE NOT EXISTS. Excludes folios that have a valid OTM mandate.
+Show active investors / Who transacted recently / Active in last 6 months,Investor Type = Active,With Active Investor Type Filter query,"Default query but WHERE condition adds:
+and (i.uuid in (select distinct map.id from
+(select max(date(pd.l_trxn_date)) as date, dim.investor_uuid id
+from sphmf.customer_schemes pd INNER JOIN distributor_investor_mapping dim
+on pd.folio_no=dim.folio_number where arn_code=? group by dim.investor_uuid) map
+where CURRENT_DATE - date <= 180))"
+Show dormant investors / Who hasn't transacted / Inactive investors / No recent activity,Investor Type = Dormant,With Dormant Investor Type Filter query,Same as Active but condition changes to CURRENT_DATE - date >= 180
+Show CGF investors / Who holds CGF schemes / CGF only,Investor Sub Type = CGF,With CGF Investor Subtype query,"Default query but WHERE condition adds:
+and (i.uuid in (select distinct dim.investor_uuid id from sphmf.customer_schemes pd
+inner join distributor_investor_mapping dim on dim.folio_number=pd.folio_no
+where arn_code=? and (pd.sch_code in
+(select schcode from sphmf.scheme_setup where cgf_flag='C' and plan_type<>'D'))))"
+Show minor investors / Investors who are minors / Minor accounts only,Investor Sub Type = Minor,With Minor Investor Subtype query,"Default query but joins sphmf.customer_master cm on cm.folio_no=dim.folio_number and WHERE adds:
+and ((cm.inv_type='02' or cm.inv_type='26'))"
+Show CGF and minor investors / Investors who are CGF or minor / Both CGF and minor selected,Investor Sub Type = CGF + Minor,With Minor and CGF Investor Sub-Type query,"Combines CGF and Minor conditions using OR:
+WHERE (CGF scheme check) OR (cm.inv_type='02' or cm.inv_type='26')"
+Show others / Non CGF non minor investors / Investors not in CGF or minor,Investor Sub Type = Others,With Others Investor Subtype Filter query,"Default query but WHERE adds both exclusions:
+and (investor NOT IN CGF schemes) AND (NOT (cm.inv_type='02' or cm.inv_type='26'))"
+Show active investors with OTM / Active investors who have mandate,Investor Type = Active + OTM = Yes (combination - run both separately),"Run Active query first, then apply OTM Yes filter on result",No single combined query exists in the document for this. Active query handles the 180 day check. OTM Yes query handles the mandate check. Run both and intersect results.
+Show dormant investors with no OTM / Inactive investors without mandate,Investor Type = Dormant + OTM = No (combination - run both separately),"Run Dormant query first, then apply OTM No filter on result",No single combined query in document. Dormant query checks last transaction >= 180 days. OTM No query checks WHERE NOT EXISTS on multiple_bank. Run both and intersect.
+Show CGF investors who are active / Active CGF investors,Investor Type = Active + Sub Type = CGF (combination - run both separately),"Run CGF query first, then apply Active filter on result",No single combined query in document. CGF query checks scheme_setup for cgf_flag = C. Active query checks last transaction within 180 days. Run both and intersect.
+Show minor investors with OTM / Minor investors who have mandate,Sub Type = Minor + OTM = Yes (combination - run both separately),"Run Minor query first, then apply OTM Yes filter on result",No single combined query in document for this combination. Minor query checks inv_type 02 or 26. OTM Yes query checks multiple_bank. Run both and intersect results.
+Find investor named Rahul / Search for Priya / Look up investor by name,Name search,Default query with name in search parameter,The WHERE clause already has: (case when ?<>'' then lower(i.first_name) ILIKE ? else true end). Pass the name as the parameter instead of empty string.

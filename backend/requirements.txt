@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+google-adk
+psycopg[binary,pool]
+pydantic-settings
+python-dotenv
+pytest
+httpx
