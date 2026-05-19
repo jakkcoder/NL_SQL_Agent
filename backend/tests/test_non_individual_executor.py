@@ -1,4 +1,4 @@
-from app.core.settings import Settings
+from app.core.config import AppConfig
 from app.models.search_plan import InvestorSubtype, InvestorTypeFilter, NonIndividualOtmFilter, SearchPlan
 from app.services.non_individual_executor import NonIndividualInvestorExecutor
 
@@ -18,7 +18,7 @@ class DummyDb:
 
 def test_single_non_individual_filter_runs_one_template():
     db = DummyDb()
-    executor = NonIndividualInvestorExecutor(db, Settings(database_url=None))
+    executor = NonIndividualInvestorExecutor(db, AppConfig(dev_database_url=None, prod_database_url=None))
     plan = SearchPlan()
     plan.non_individual_otm = NonIndividualOtmFilter.YES
 
@@ -30,7 +30,7 @@ def test_single_non_individual_filter_runs_one_template():
 
 def test_combination_runs_separate_queries_and_intersects():
     db = DummyDb()
-    executor = NonIndividualInvestorExecutor(db, Settings(database_url=None))
+    executor = NonIndividualInvestorExecutor(db, AppConfig(dev_database_url=None, prod_database_url=None))
     plan = SearchPlan()
     plan.non_individual_otm = NonIndividualOtmFilter.YES
     plan.investor_type = InvestorTypeFilter.ACTIVE
@@ -43,7 +43,7 @@ def test_combination_runs_separate_queries_and_intersects():
 
 def test_cgf_minor_uses_single_combined_template():
     db = DummyDb()
-    executor = NonIndividualInvestorExecutor(db, Settings(database_url=None))
+    executor = NonIndividualInvestorExecutor(db, AppConfig(dev_database_url=None, prod_database_url=None))
     plan = SearchPlan()
     plan.investor_subtypes = [InvestorSubtype.CGF, InvestorSubtype.MINOR]
 

@@ -24,16 +24,53 @@ Update `backend/.env` with the real read-only PostgreSQL connection string and G
 uvicorn app.main:app --reload --port 8000
 ```
 
-Open `frontend/index.html` in a browser. The default endpoint is already `http://localhost:8000/chat`.
+The backend now uses Google ADK's built-in FastAPI server. List the available
+agents with:
+
+```bash
+curl http://localhost:8000/list-apps
+```
+
+Send a message through ADK's runtime API:
+
+```bash
+curl -X POST http://localhost:8000/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appName": "investor_search_agent",
+    "userId": "local_user",
+    "sessionId": "local_session",
+    "newMessage": {
+      "role": "user",
+      "parts": [{"text": "show individual investors"}]
+    }
+  }'
+```
 
 ### Required Environment
 
-- `DATABASE_URL`: real PostgreSQL read-only connection.
+- `APP_ENV`: runtime environment. Use `local`, `dev`, or `development` for dev DB; `production` or `prod` for prod DB.
+- `LOG_LEVEL`: application log level, default `INFO`.
+- `DEV_DATABASE_URL`: PostgreSQL read-only connection for local/dev.
+- `DEV_DB_STATEMENT_TIMEOUT_MS`: dev statement timeout, default `15000`.
+- `DEV_DB_POOL_MIN_SIZE`: dev pool minimum size, default `1`.
+- `DEV_DB_POOL_MAX_SIZE`: dev pool maximum size, default `4`.
+- `PROD_DATABASE_URL`: PostgreSQL read-only connection for production.
+- `PROD_DB_STATEMENT_TIMEOUT_MS`: prod statement timeout, default `15000`.
+- `PROD_DB_POOL_MIN_SIZE`: prod pool minimum size, default `2`.
+- `PROD_DB_POOL_MAX_SIZE`: prod pool maximum size, default `10`.
 - `DEFAULT_DEV_ARN`: local testing ARN, for example `ARN-0411`.
-- `GOOGLE_API_KEY`: Google model key for ADK/Gemini use.
-- `GOOGLE_ADK_MODEL`: model name, default `gemini-2.0-flash`.
-- `DB_STATEMENT_TIMEOUT_MS`: statement timeout, default `15000`.
+- `LLM_PROVIDER`: set `bedrock` for AWS Bedrock via ADK LiteLLM (default).
+- `BEDROCK_MODEL_ID`: Bedrock model id, for example `anthropic.claude-3-haiku-20240307-v1:0`.
+- `LLM_REQUEST_TIMEOUT_SECONDS`: model request timeout, default `60`.
+- `LLM_TEMPERATURE`: model temperature, default `0`.
+- `LLM_MAX_OUTPUT_TOKENS`: optional max output tokens for Bedrock calls.
+- `AWS_REGION`: AWS region for Bedrock, for example `ap-south-1`.
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`: AWS credentials for Bedrock.
 - `DEFAULT_PAGE_LIMIT`: default result page size, default `25`.
+- `MAX_INTERSECTION_ROWS`: internal cap for Non-Individual intersection queries, default `5000`.
+- `AWS_PROFILE`, `AWS_ROLE_ARN`, `AWS_SECRETS_MANAGER_PREFIX`: optional AWS deployment/secret-manager settings.
+- `ALLOWED_ORIGINS`: comma-separated CORS origins.
 
 ### Test
 

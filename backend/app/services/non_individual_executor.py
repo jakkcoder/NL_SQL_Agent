@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from typing import Any
 
-from app.core.settings import Settings
+from app.core.config import AppConfig
 from app.db.postgres import PostgresClient
 from app.models.search_plan import (
     InvestorSubtype,
@@ -18,9 +18,9 @@ class NonIndividualInvestorExecutor:
     run each individual filter query separately, then intersect result sets.
     """
 
-    def __init__(self, db: PostgresClient, settings: Settings) -> None:
+    def __init__(self, db: PostgresClient, settings: AppConfig) -> None:
         self._db = db
-        self._settings = settings
+        self._settings = settings.search
 
     def execute(self, plan: SearchPlan, arn_code: str) -> list[dict[str, Any]]:
         template_names = self._template_names(plan)

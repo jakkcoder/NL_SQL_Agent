@@ -1,40 +1,24 @@
-from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from google.adk.cli.fast_api import get_fast_api_app
 
-from app.api.chat import router as chat_router
-from app.core.settings import get_settings
-from app.db.postgres import PostgresClient
-from app.services.chat_service import ChatService
+from app.core.config import apply_runtime_env, get_config
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = get_settings()
-    db = PostgresClient(settings.database_url, settings.db_statement_timeout_ms)
-    db.open()
-    app.state.settings = settings
-    app.state.db = db
-    app.state.chat_service = ChatService(db, settings)
-    yield
-    db.close()
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+AGENTS_DIR = BACKEND_DIR / "adk_agents"
 
+config = get_config()
+apply_runtime_env(config)
+missing_config = config.production_missing_values()
+if missing_config:
+    missing = ", ".join(missing_config)
+    raise RuntimeError(f"Missing required production configuration: {missing}")
 
-app = FastAPI(title="Investor Chatbot MVP", version="0.1.0", lifespan=lifespan)
-
-settings = get_settings()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app: FastAPI = get_fast_api_app(
+    agents_dir=str(AGENTS_DIR),
+    allow_origins=config.security.allowed_origins,
+    web=False,
+    auto_create_session=True,
 )
-
-app.include_router(chat_router)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
