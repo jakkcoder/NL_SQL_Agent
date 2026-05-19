@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chatbot Tester</title>
+  <title>Investor Chatbot Tester</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
     <header class="header">
       <div class="header__brand">
         <span class="header__dot" aria-hidden="true"></span>
-        <h1>Chatbot Tester</h1>
+        <h1>Investor Chatbot Tester</h1>
       </div>
       <button type="button" id="settings-toggle" class="btn btn--ghost" aria-expanded="false" aria-controls="settings-panel">
         Settings
@@ -20,23 +20,28 @@
 
     <section id="settings-panel" class="settings" hidden>
       <label class="field">
-        <span class="field__label">API endpoint</span>
-        <input type="url" id="api-url" placeholder="http://localhost:8000/chat" autocomplete="off" />
+        <span class="field__label">Backend base URL</span>
+        <input type="url" id="api-base-url" placeholder="http://127.0.0.1:8000" autocomplete="off" />
       </label>
       <label class="field">
-        <span class="field__label">Request body field (your message key)</span>
-        <input type="text" id="message-key" value="message" autocomplete="off" />
+        <span class="field__label">ADK app name</span>
+        <input type="text" id="app-name" value="investor_search_agent" autocomplete="off" />
       </label>
       <label class="field">
-        <span class="field__label">Response field (bot reply key)</span>
-        <input type="text" id="response-key" value="reply" autocomplete="off" />
+        <span class="field__label">User ID</span>
+        <input type="text" id="user-id" value="local_user" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field__label">Session ID</span>
+        <input type="text" id="session-id" placeholder="Auto-generated" autocomplete="off" />
       </label>
       <label class="field">
         <span class="field__label">Optional Bearer token</span>
         <input type="password" id="api-token" placeholder="Leave empty if not needed" autocomplete="off" />
       </label>
       <div class="settings__actions">
-        <button type="button" id="save-settings" class="btn btn--primary">Save settings</button>
+        <button type="button" id="test-connection" class="btn btn--primary">Test connection</button>
+        <button type="button" id="save-settings" class="btn btn--ghost">Save settings</button>
         <button type="button" id="clear-chat" class="btn btn--ghost">Clear chat</button>
       </div>
     </section>
@@ -48,7 +53,7 @@
       <textarea
         id="user-input"
         rows="1"
-        placeholder="Type a message…"
+        placeholder="Try: show individual investors"
         required
       ></textarea>
       <button type="submit" id="send-btn" class="btn btn--primary" aria-label="Send message">

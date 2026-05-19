@@ -1,9 +1,10 @@
 const STORAGE_KEY = "chatbot-tester-settings";
 
 const DEFAULTS = {
-  apiUrl: "http://localhost:8000/chat",
-  messageKey: "message",
-  responseKey: "reply",
+  apiBaseUrl: "http://127.0.0.1:8000",
+  appName: "investor_search_agent",
+  userId: "local_user",
+  sessionId: "",
   token: "",
 };
 
@@ -15,32 +16,41 @@ const els = {
   status: document.getElementById("status"),
   settingsPanel: document.getElementById("settings-panel"),
   settingsToggle: document.getElementById("settings-toggle"),
-  apiUrl: document.getElementById("api-url"),
-  messageKey: document.getElementById("message-key"),
-  responseKey: document.getElementById("response-key"),
+  apiBaseUrl: document.getElementById("api-base-url"),
+  appName: document.getElementById("app-name"),
+  userId: document.getElementById("user-id"),
+  sessionId: document.getElementById("session-id"),
   apiToken: document.getElementById("api-token"),
   saveSettings: document.getElementById("save-settings"),
+  testConnection: document.getElementById("test-connection"),
   clearChat: document.getElementById("clear-chat"),
 };
 
-/** @type {{ role: "user" | "assistant", content: string }[]} */
+/** @type {{ role: "user" | "assistant", content: string, rows?: Record<string, unknown>[], count?: number, page?: { limit: number, offset: number } | null }[]} */
 let conversation = [];
 let isSending = false;
+
+function createSessionId() {
+  return `session_${Date.now()}`;
+}
 
 function loadSettings() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
+    const settings = raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
+    settings.sessionId = createSessionId();
+    return settings;
   } catch {
-    return { ...DEFAULTS };
+    return { ...DEFAULTS, sessionId: createSessionId() };
   }
 }
 
 function saveSettingsToStorage() {
   const settings = {
-    apiUrl: els.apiUrl.value.trim() || DEFAULTS.apiUrl,
-    messageKey: els.messageKey.value.trim() || DEFAULTS.messageKey,
-    responseKey: els.responseKey.value.trim() || DEFAULTS.responseKey,
+    apiBaseUrl: els.apiBaseUrl.value.trim() || DEFAULTS.apiBaseUrl,
+    appName: els.appName.value.trim() || DEFAULTS.appName,
+    userId: els.userId.value.trim() || DEFAULTS.userId,
+    sessionId: els.sessionId.value.trim() || createSessionId(),
     token: els.apiToken.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -48,10 +58,23 @@ function saveSettingsToStorage() {
 }
 
 function applySettingsToForm(settings) {
-  els.apiUrl.value = settings.apiUrl;
-  els.messageKey.value = settings.messageKey;
-  els.responseKey.value = settings.responseKey;
+  els.apiBaseUrl.value = settings.apiBaseUrl;
+  els.appName.value = settings.appName;
+  els.userId.value = settings.userId;
+  els.sessionId.value = settings.sessionId;
   els.apiToken.value = settings.token;
+}
+
+function apiUrl(settings, path) {
+  return `${settings.apiBaseUrl.replace(/\/$/, "")}${path}`;
+}
+
+function authHeaders(settings) {
+  const headers = { "Content-Type": "application/json" };
+  if (settings.token) {
+    headers.Authorization = `Bearer ${settings.token}`;
+  }
+  return headers;
 }
 
 function setStatus(text, isError = false) {
@@ -66,10 +89,10 @@ function scrollToBottom() {
 function renderEmptyState() {
   if (conversation.length > 0) return;
   els.chatLog.innerHTML =
-    '<p class="empty-state">Send a message to test your chatbot.<br />Configure the API URL in Settings.</p>';
+    '<p class="empty-state">Send a message to test your ADK backend.<br />Use Settings to verify the API connection.</p>';
 }
 
-function appendMessage(role, content, { isError = false } = {}) {
+function appendMessage(role, content, { isError = false, rows = [], count = 0, page = null } = {}) {
   const empty = els.chatLog.querySelector(".empty-state");
   if (empty) empty.remove();
 
@@ -82,48 +105,163 @@ function appendMessage(role, content, { isError = false } = {}) {
 
   const body = document.createElement("p");
   body.style.margin = "0";
+  body.style.whiteSpace = "pre-wrap";
   body.textContent = content;
 
-  wrap.append(label, body);
+  wrap.append(label);
+  if (content) {
+    wrap.append(body);
+  }
+  if (!isError && Array.isArray(rows) && rows.length > 0) {
+    wrap.append(createRowsTable(rows, count, page));
+  }
   els.chatLog.appendChild(wrap);
   scrollToBottom();
 }
 
-function getNestedValue(obj, path) {
-  return path.split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
-}
+function createRowsTable(rows, count, page) {
+  const container = document.createElement("div");
+  container.className = "table-card";
 
-function extractReply(data, responseKey) {
-  const direct = getNestedValue(data, responseKey);
-  if (typeof direct === "string") return direct;
+  const summary = document.createElement("div");
+  summary.className = "table-summary";
+  const total = Number.isFinite(count) && count > 0 ? count : rows.length;
+  const start = page?.offset != null ? page.offset + 1 : 1;
+  const end = page?.offset != null ? page.offset + rows.length : rows.length;
+  summary.textContent = `Found ${total} investor(s). Showing ${start}-${end}.`;
+  container.appendChild(summary);
 
-  const fallbacks = ["reply", "response", "answer", "text", "content", "message"];
-  for (const key of fallbacks) {
-    const val = data[key];
-    if (typeof val === "string") return val;
+  const scroll = document.createElement("div");
+  scroll.className = "table-scroll";
+
+  const table = document.createElement("table");
+  table.className = "results-table";
+
+  const columns = [
+    ["first_name", "Name"],
+    ["pan_number", "PAN"],
+    ["dob", "DOB"],
+    ["email", "Email"],
+    ["mobile_number", "Mobile"],
+    ["folio_number", "Folio"],
+    ["otm", "OTM"],
+  ];
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const [, label] of columns) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    headRow.appendChild(th);
+  }
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    for (const [key] of columns) {
+      const td = document.createElement("td");
+      const value = row[key] ?? (key === "first_name" ? row.name : undefined);
+      td.textContent = formatCell(value);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  scroll.appendChild(table);
+  container.appendChild(scroll);
+
+  if (page?.limit && rows.length === page.limit) {
+    const hint = document.createElement("div");
+    hint.className = "table-hint";
+    hint.textContent = "Ask for the next page to see more results.";
+    container.appendChild(hint);
   }
 
-  if (typeof data === "string") return data;
-  return JSON.stringify(data, null, 2);
+  return container;
+}
+
+function formatCell(value) {
+  if (value === null || value === undefined || value === "") return "N/A";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
+
+function extractReplyFromEvents(events) {
+  if (!Array.isArray(events) || events.length === 0) {
+    return { content: "No response events returned." };
+  }
+
+  const toolReplies = [];
+  const textReplies = [];
+
+  for (const event of events) {
+    const parts = event?.content?.parts || [];
+    for (const part of parts) {
+      const toolReply = part?.functionResponse?.response?.reply;
+      if (typeof toolReply === "string" && toolReply.trim()) {
+        const response = part.functionResponse.response;
+        const rows = response.rows || [];
+        toolReplies.push({
+          content: rows.length > 0 ? "" : toolReply.trim(),
+          rows,
+          count: response.count || 0,
+          page: response.page || null,
+        });
+      }
+      if (typeof part?.text === "string" && part.text.trim()) {
+        textReplies.push(part.text.trim());
+      }
+    }
+  }
+
+  if (toolReplies.length > 0) {
+    return toolReplies[toolReplies.length - 1];
+  }
+  if (textReplies.length > 0) {
+    return { content: textReplies[textReplies.length - 1] };
+  }
+
+  return { content: JSON.stringify(events[events.length - 1], null, 2) };
+}
+
+async function testBackendConnection(settings) {
+  const healthResponse = await fetch(apiUrl(settings, "/health"), {
+    headers: authHeaders(settings),
+  });
+  if (!healthResponse.ok) {
+    throw new Error(`Health check failed with HTTP ${healthResponse.status}`);
+  }
+
+  const appsResponse = await fetch(apiUrl(settings, "/list-apps"), {
+    headers: authHeaders(settings),
+  });
+  if (!appsResponse.ok) {
+    throw new Error(`List apps failed with HTTP ${appsResponse.status}`);
+  }
+
+  const apps = await appsResponse.json();
+  if (!apps.includes(settings.appName)) {
+    throw new Error(`Agent "${settings.appName}" not found. Available: ${apps.join(", ")}`);
+  }
+
+  return apps;
 }
 
 async function sendToBot(userText, settings) {
-  const body = {
-    [settings.messageKey]: userText,
-    messages: conversation,
-  };
-
-  const headers = {
-    "Content-Type": "application/json",
-  };
-  if (settings.token) {
-    headers.Authorization = `Bearer ${settings.token}`;
-  }
-
-  const response = await fetch(settings.apiUrl, {
+  const response = await fetch(apiUrl(settings, "/run"), {
     method: "POST",
-    headers,
-    body: JSON.stringify(body),
+    headers: authHeaders(settings),
+    body: JSON.stringify({
+      appName: settings.appName,
+      userId: settings.userId,
+      sessionId: settings.sessionId,
+      newMessage: {
+        role: "user",
+        parts: [{ text: userText }],
+      },
+    }),
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -142,7 +280,7 @@ async function sendToBot(userText, settings) {
     throw new Error(`HTTP ${response.status}: ${detail}`);
   }
 
-  return extractReply(data, settings.responseKey);
+  return extractReplyFromEvents(data);
 }
 
 async function handleSubmit(event) {
@@ -166,14 +304,18 @@ async function handleSubmit(event) {
 
   try {
     const reply = await sendToBot(text, settings);
-    conversation.push({ role: "assistant", content: reply });
-    appendMessage("assistant", reply);
+    conversation.push({ role: "assistant", ...reply });
+    appendMessage("assistant", reply.content, {
+      rows: reply.rows,
+      count: reply.count,
+      page: reply.page,
+    });
     setStatus("");
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Request failed";
     appendMessage("assistant", msg, { isError: true });
     setStatus(
-      "Could not reach the API. Is your backend running? Enable CORS for this origin.",
+      "Could not reach the backend. Confirm uvicorn is running and CORS allows this origin.",
       true
     );
     conversation.pop();
@@ -182,6 +324,18 @@ async function handleSubmit(event) {
     els.sendBtn.disabled = false;
     els.userInput.disabled = false;
     els.userInput.focus();
+  }
+}
+
+async function handleTestConnection() {
+  const settings = saveSettingsToStorage();
+  setStatus("Testing backend connection…");
+  try {
+    const apps = await testBackendConnection(settings);
+    setStatus(`Connected. Available agents: ${apps.join(", ")}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Connection test failed";
+    setStatus(msg, true);
   }
 }
 
@@ -208,11 +362,17 @@ els.saveSettings.addEventListener("click", () => {
   setTimeout(() => setStatus(""), 2000);
 });
 
+els.testConnection.addEventListener("click", () => {
+  handleTestConnection();
+});
+
 els.clearChat.addEventListener("click", () => {
   conversation = [];
   els.chatLog.innerHTML = "";
+  els.sessionId.value = createSessionId();
+  saveSettingsToStorage();
   renderEmptyState();
-  setStatus("Chat cleared.");
+  setStatus("Chat cleared. New ADK session created.");
   setTimeout(() => setStatus(""), 2000);
 });
 
@@ -228,4 +388,5 @@ els.chatForm.addEventListener("submit", handleSubmit);
 
 applySettingsToForm(loadSettings());
 renderEmptyState();
+handleTestConnection();
 els.userInput.focus();
