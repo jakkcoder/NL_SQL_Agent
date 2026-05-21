@@ -35,7 +35,7 @@ def main() -> int:
 
     config = get_config()
     catalog = refresh_catalog_from_db(
-        database_url=config.database_url_value,
+        database_url=config.filter_catalog_refresh_database_url,
         statement_timeout_ms=config.database.statement_timeout_ms,
         output_path=args.output,
     )

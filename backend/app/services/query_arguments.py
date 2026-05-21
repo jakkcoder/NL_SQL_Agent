@@ -1,4 +1,4 @@
-"""Map SearchPlan to query-engine arguments (Individual function / NI templates)."""
+"""Map SearchPlan to query-engine arguments (Individual warehouse SQL / NI templates)."""
 
 from typing import Any
 
@@ -10,7 +10,7 @@ from app.models.search_plan import (
     NonIndividualOtmFilter,
     SearchPlan,
 )
-from app.services.search_plan_builder import describe_search_plan
+from app.services.search_plan_describe import describe_search_plan
 
 
 def plan_to_query_arguments(plan: SearchPlan) -> dict[str, Any]:
@@ -35,9 +35,13 @@ def list_filters_applied(plan: SearchPlan) -> list[str]:
     labels: list[str] = []
     if plan.name_search:
         labels.append(f"Name search = {plan.name_search}")
-    if plan.eligibility.value != "ALL" and plan.investor_tab == InvestorTab.INDIVIDUAL:
-        labels.append(f"Eligibility = {plan.eligibility.value}")
     if plan.investor_tab == InvestorTab.INDIVIDUAL:
+        if plan.city and str(plan.city).strip():
+            labels.append(f"City = {plan.city.strip()}")
+        if plan.age_min is not None or plan.age_max is not None:
+            labels.append(f"Age (years) = {plan.age_min!s}–{plan.age_max!s}")
+        if plan.eligibility.value != "ALL":
+            labels.append(f"Eligibility = {plan.eligibility.value}")
         if plan.individual_otm.value != "ALL":
             labels.append(f"OTM = {plan.individual_otm.value}")
     elif plan.non_individual_otm.value != "ALL":
@@ -66,7 +70,7 @@ def list_filters_applied(plan: SearchPlan) -> list[str]:
 
 
 def _individual_arguments(plan: SearchPlan) -> dict[str, Any]:
-    """Arguments for filter_dp_investor_menu per Individual Investors CSV."""
+    """Structured filter snapshot for Individual warehouse SQL (same fields the SQL builder uses)."""
 
     parameters: dict[str, Any] = {
         "eligibility": plan.eligibility.value,
@@ -77,6 +81,9 @@ def _individual_arguments(plan: SearchPlan) -> dict[str, Any]:
         "systematic": _systematic_argument(plan),
         "activity": _activity_argument(plan),
         "search_text": plan.name_search,
+        "city": (plan.city or "").strip() or None,
+        "age_min": plan.age_min,
+        "age_max": plan.age_max,
         "sort_key": plan.sort_key,
         "sort_order": plan.sort_order,
         "page_limit": plan.page_limit,
@@ -84,12 +91,12 @@ def _individual_arguments(plan: SearchPlan) -> dict[str, Any]:
         "include_count": "Y",
     }
     return {
-        "engine": "filter_dp_investor_menu",
+        "engine": "individual_warehouse_catalog",
         "investor_tab": InvestorTab.INDIVIDUAL.value,
-        "function": "filter_dp_investor_menu",
+        "function": "warehouse_select",
         "parameters": parameters,
         "filters_applied": list_filters_applied(plan),
-        "combination_strategy": "single_function",
+        "combination_strategy": "warehouse_select",
         "normalized_summary": describe_search_plan(plan),
     }
 

@@ -62,6 +62,15 @@ def main() -> int:
     contract = build_full_schema_contract(url)
     out_path.write_text(json.dumps(contract, indent=2, default=str), encoding="utf-8")
 
+    from app.services.schema_contract_guide import write_schema_guide_files  # noqa: E402
+
+    catalog_path = here / "filter_catalog.json"
+    catalog = None
+    if catalog_path.is_file():
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    gj, gm = write_schema_guide_files(contract, filter_catalog=catalog, database_url=url)
+    print(f"Wrote {gj.name} and {gm.name}")
+
     total_cols = sum(int(t["column_count_information_schema"]) for t in contract["tables"])
     print(f"Wrote {out_path}")
     print(f"tables: {contract['tables_found']}  issues: {contract['tables_missing_in_database']}")

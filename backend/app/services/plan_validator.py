@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from app.models.search_plan import (
     ALLOWED_DURATIONS,
@@ -9,7 +9,7 @@ from app.models.search_plan import (
     NonIndividualOtmFilter,
     SearchPlan,
 )
-from app.services.filter_catalog import get_filter_catalog
+from app.services.filter_catalog import get_filter_catalog_for_session
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ class ValidationResult:
 class PlanValidator:
     """Deterministic gatekeeper for all agent-produced search plans."""
 
-    def validate(self, plan: SearchPlan) -> ValidationResult:
+    def validate(self, plan: SearchPlan, session_state: dict[str, Any] | None = None) -> ValidationResult:
         if plan.investor_tab == InvestorTab.PENDING:
             return ValidationResult(
                 status="out_of_scope",
@@ -44,7 +44,7 @@ class PlanValidator:
                 ),
             )
 
-        catalog = get_filter_catalog()
+        catalog = get_filter_catalog_for_session(session_state)
         allowed_durations = set(catalog.get_values("activity_duration")) or ALLOWED_DURATIONS
         if plan.activity.duration not in allowed_durations:
             return ValidationResult(
@@ -52,7 +52,7 @@ class PlanValidator:
                 message="That duration is not supported. Use 1, 2, 3, or 6 months; 1, 2, or 3 years; or this financial year.",
             )
 
-        invalid_scheme = self._first_invalid_scheme(plan)
+        invalid_scheme = self._first_invalid_scheme(plan, session_state)
         if invalid_scheme:
             return ValidationResult(
                 status="out_of_scope",
@@ -67,8 +67,10 @@ class PlanValidator:
 
         return ValidationResult(status="valid")
 
-    def _first_invalid_scheme(self, plan: SearchPlan) -> str | None:
-        catalog = get_filter_catalog()
+    def _first_invalid_scheme(
+        self, plan: SearchPlan, session_state: dict[str, Any] | None
+    ) -> str | None:
+        catalog = get_filter_catalog_for_session(session_state)
         for schemes in (plan.holding.schemes, plan.systematic.schemes, plan.activity.schemes):
             for scheme in schemes:
                 if scheme == "ALL":
@@ -80,6 +82,9 @@ class PlanValidator:
     def has_any_filter(self, plan: SearchPlan) -> bool:
         return (
             bool(plan.name_search)
+            or bool(plan.city and str(plan.city).strip())
+            or plan.age_min is not None
+            or plan.age_max is not None
             or plan.individual_otm != IndividualOtmFilter.ALL
             or plan.non_individual_otm != NonIndividualOtmFilter.ALL
             or bool(plan.investor_subtypes)

@@ -2,8 +2,7 @@
 
 Used by:
 - ``app/data/export_investor_schema_contract.py`` (refresh local JSON)
-- ``fetch_investor_schema_contract_tool`` (live ADK session snapshot)
-- ``search_plan_builder`` (optional context for the SearchPlan LLM)
+- ``generate_catalog_sql_query_tool`` / ``ensure_session_search_artifacts`` (session snapshot)
 """
 
 from __future__ import annotations
@@ -314,6 +313,29 @@ def schema_for_search_plan_llm(session_state: dict[str, Any] | None) -> dict[str
     if packaged:
         return compact_schema_contract(packaged)
     return None
+
+
+def schema_contract_for_sql_generator(
+    filter_catalog: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Compact schema guide for catalog SQL generation (not the 700KB+ raw contract)."""
+
+    from app.services.schema_contract_guide import schema_guide_for_sql_generator
+
+    return schema_guide_for_sql_generator(filter_catalog)
+
+
+def serialize_schema_contract_for_prompt(contract: dict[str, Any], max_chars: int) -> str:
+    """JSON string for LLM user payload; truncate only when over ``max_chars``."""
+
+    from app.services.schema_contract_guide import serialize_schema_guide_for_prompt
+
+    if contract.get("contract_kind") == "investor_schema_guide":
+        return serialize_schema_guide_for_prompt(contract, max_chars)
+    raw = json.dumps(contract, ensure_ascii=True, default=str)
+    if len(raw) <= max_chars:
+        return raw
+    return raw[: max_chars - 80] + "\n...(investor_schema_contract_json truncated for prompt size)\n"
 
 
 def write_full_schema_contract_atomic(full: dict[str, Any], path: Path | None = None) -> Path:

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -102,11 +103,30 @@ class AppConfig(BaseSettings):
 
     dynamic_investor_sql_enabled: bool = Field(default=False, alias="DYNAMIC_INVESTOR_SQL_ENABLED")
     dynamic_sql_llm_model: str | None = Field(default=None, alias="DYNAMIC_SQL_LLM_MODEL")
+    router_llm_model: str | None = Field(default=None, alias="ROUTER_LLM_MODEL")
+    query_generator_llm_model: str | None = Field(default=None, alias="QUERY_GENERATOR_LLM_MODEL")
+    query_generator_max_output_tokens: int | None = Field(default=None, alias="QUERY_GENERATOR_MAX_OUTPUT_TOKENS")
+    query_generator_catalog_max_chars: int = Field(default=200_000, alias="QUERY_GENERATOR_CATALOG_MAX_CHARS")
+    query_generator_schema_contract_max_chars: int = Field(
+        default=120_000,
+        alias="QUERY_GENERATOR_SCHEMA_CONTRACT_MAX_CHARS",
+    )
+    query_generator_guide_only: bool = Field(
+        default=True,
+        alias="QUERY_GENERATOR_GUIDE_ONLY",
+    )
 
     llm_provider: str = Field(default="bedrock", alias="LLM_PROVIDER")
+    # Root ADK agent (routing + tool calls): prefer a small/fast Bedrock model.
     bedrock_model_id: str = Field(
         default="anthropic.claude-3-haiku-20240307-v1:0",
         alias="BEDROCK_MODEL_ID",
+    )
+    bedrock_root_model_id: str | None = Field(default=None, alias="BEDROCK_ROOT_MODEL_ID")
+    # Catalog SQL generator (large filter_catalog_json in one shot): large-context Bedrock model.
+    bedrock_query_generator_model_id: str = Field(
+        default="anthropic.claude-3-sonnet-20240229-v1:0",
+        alias="BEDROCK_QUERY_GENERATOR_MODEL_ID",
     )
     google_api_key: SecretStr | None = Field(default=None, alias="GOOGLE_API_KEY")
     google_adk_model: str = Field(default="gemini-2.0-flash", alias="GOOGLE_ADK_MODEL")
@@ -126,6 +146,9 @@ class AppConfig(BaseSettings):
     aws_secrets_manager_prefix: str | None = Field(default=None, alias="AWS_SECRETS_MANAGER_PREFIX")
 
     filter_catalog_path: str | None = Field(default=None, alias="FILTER_CATALOG_PATH")
+    filter_catalog_sqlite_path: str | None = Field(default=None, alias="FILTER_CATALOG_SQLITE_PATH")
+    dev_local_sqlite_mirror: str | None = Field(default=None, alias="DEV_LOCAL_SQLITE_MIRROR")
+    dev_investor_search_use_sqlite: bool = Field(default=False, alias="DEV_INVESTOR_SEARCH_USE_SQLITE")
     adk_web_ui: bool | None = Field(default=None, alias="ADK_WEB_UI")
 
     allowed_origins: str = Field(
@@ -140,6 +163,14 @@ class AppConfig(BaseSettings):
         populate_by_name=True,
     )
 
+    @field_validator("default_dev_arn", mode="after")
+    @classmethod
+    def normalize_default_dev_arn(cls, value: str) -> str:
+        """Distributor scope for dev/local runs; keep a single safe default when unset or blank."""
+
+        s = (value or "").strip()
+        return s or "ARN-0411"
+
     @field_validator(
         "dev_database_url",
         "prod_database_url",
@@ -153,6 +184,12 @@ class AppConfig(BaseSettings):
         "aws_secrets_manager_prefix",
         "llm_max_output_tokens",
         "dynamic_sql_llm_model",
+        "router_llm_model",
+        "query_generator_llm_model",
+        "query_generator_max_output_tokens",
+        "bedrock_root_model_id",
+        "filter_catalog_sqlite_path",
+        "dev_local_sqlite_mirror",
         mode="before",
     )
     @classmethod
@@ -217,16 +254,35 @@ class AppConfig(BaseSettings):
         )
 
     @property
+    def bedrock_root_model_id_resolved(self) -> str:
+        """Bedrock model id for the ADK root agent (small/fast)."""
+
+        raw = (self.bedrock_root_model_id or self.bedrock_model_id or "").strip()
+        return raw or "anthropic.claude-3-haiku-20240307-v1:0"
+
+    @property
+    def bedrock_query_generator_model_id_resolved(self) -> str:
+        """Bedrock model id for ``run_catalog_sql_generator_llm`` (large context)."""
+
+        return (self.bedrock_query_generator_model_id or "").strip() or (
+            "anthropic.claude-3-sonnet-20240229-v1:0"
+        )
+
+    @property
     def llm(self) -> LLMConfig:
+        """Root ADK agent LLM (greeting vs tool routing)."""
+
         if self.llm_provider.lower() in {"bedrock", "aws-bedrock", "aws_bedrock"}:
-            model = f"bedrock/{self.bedrock_model_id}"
+            model = f"bedrock/{self.bedrock_root_model_id_resolved}"
+            bedrock_id = self.bedrock_root_model_id_resolved
         else:
             model = self.google_adk_model
+            bedrock_id = self.bedrock_model_id
 
         return LLMConfig(
             provider=self.llm_provider,
             model=model,
-            bedrock_model_id=self.bedrock_model_id,
+            bedrock_model_id=bedrock_id,
             google_api_key=self.google_api_key,
             google_cloud_project=self.google_cloud_project,
             google_cloud_location=self.google_cloud_location,
@@ -262,6 +318,50 @@ class AppConfig(BaseSettings):
         return active.get_secret_value() if active else None
 
     @property
+    def dev_local_sqlite_mirror_file_url(self) -> str | None:
+        """``sqlite:///...`` when ``DEV_LOCAL_SQLITE_MIRROR`` points at an existing file in dev."""
+
+        if not self.runtime.is_development:
+            return None
+        raw = (self.dev_local_sqlite_mirror or "").strip()
+        if not raw:
+            return None
+        path = Path(raw)
+        if not path.is_absolute():
+            backend_root = Path(__file__).resolve().parents[2]
+            path = backend_root / path
+        if path.is_file():
+            return f"sqlite:///{path.resolve()}"
+        return None
+
+    @property
+    def dev_use_sqlite_investor_search(self) -> bool:
+        """Run default Individual list queries on the SQLite mirror (development only)."""
+
+        if not self.runtime.is_development:
+            return False
+        if not self.dev_investor_search_use_sqlite:
+            return False
+        return self.dev_local_sqlite_mirror_file_url is not None
+
+    @property
+    def filter_catalog_refresh_database_url(self) -> str | None:
+        """PostgreSQL warehouse URL or ``sqlite:///...`` for filter catalog merge only."""
+
+        mirror = self.dev_local_sqlite_mirror_file_url
+        if mirror:
+            return mirror
+        raw = (self.filter_catalog_sqlite_path or "").strip()
+        if raw:
+            path = Path(raw)
+            if not path.is_absolute():
+                backend_root = Path(__file__).resolve().parents[2]
+                path = backend_root / path
+            if path.is_file():
+                return f"sqlite:///{path.resolve()}"
+        return self.database_url_value
+
+    @property
     def dynamic_sql_llm_model_resolved(self) -> str:
         """Model id for dynamic SQL ReAct engine (LiteLLM format, e.g. bedrock/...)."""
 
@@ -273,6 +373,50 @@ class AppConfig(BaseSettings):
                 return f"bedrock/{raw}"
             return raw
         return self.llm.model
+
+    def _optional_litellm_model(self, raw: str | None, *, fallback: str) -> str:
+        if raw and str(raw).strip():
+            rid = str(raw).strip()
+            if self.llm_provider.lower() in {"bedrock", "aws-bedrock", "aws_bedrock"} and not rid.startswith(
+                "bedrock/"
+            ):
+                return f"bedrock/{rid}"
+            return rid
+        return fallback
+
+    @property
+    def router_llm_model_resolved(self) -> str:
+        """Small classifier model (LiteLLM id); defaults to main ``llm`` model."""
+
+        return self._optional_litellm_model(self.router_llm_model, fallback=self.llm.model)
+
+    @property
+    def query_generator_llm_model_resolved(self) -> str:
+        """Large-context catalog SQL author (LiteLLM id).
+
+        Resolution order:
+        1. ``QUERY_GENERATOR_LLM_MODEL`` if set
+        2. ``BEDROCK_QUERY_GENERATOR_MODEL_ID`` when ``LLM_PROVIDER`` is Bedrock
+        3. ``DYNAMIC_SQL_LLM_MODEL`` / root ``llm`` model (non-Bedrock or legacy override)
+        """
+
+        if self.query_generator_llm_model and self.query_generator_llm_model.strip():
+            return self._optional_litellm_model(
+                self.query_generator_llm_model,
+                fallback=self.llm.model,
+            )
+        if self.llm_provider.lower() in {"bedrock", "aws-bedrock", "aws_bedrock"}:
+            return f"bedrock/{self.bedrock_query_generator_model_id_resolved}"
+        return self._optional_litellm_model(
+            self.dynamic_sql_llm_model,
+            fallback=self.llm.model,
+        )
+
+    @property
+    def query_generator_max_output_tokens_resolved(self) -> int | None:
+        if self.query_generator_max_output_tokens is not None:
+            return self.query_generator_max_output_tokens
+        return self.llm_max_output_tokens
 
     @property
     def dev_database_url_value(self) -> str | None:

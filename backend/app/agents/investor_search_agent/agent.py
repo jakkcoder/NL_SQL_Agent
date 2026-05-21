@@ -11,19 +11,11 @@ if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
 from google.adk.agents.llm_agent import Agent
-from google.adk.models.lite_llm import LiteLlm
+from google.genai import types as genai_types
 
-from app.services.filter_prompts import build_root_agent_instruction
-from app.agents.tools import (
-    analyze_search_arguments_tool,
-    detect_intent_tool,
-    fetch_investor_schema_contract_tool,
-    greeting_tool,
-    run_dynamic_investor_sql_tool,
-    search_investors_tool,
-    unsupported_banking_tool,
-)
+from app.agents.tools import generate_catalog_sql_query_tool, greeting_tool
 from app.core.config import apply_runtime_env, get_config
+from app.services.filter_prompts import build_root_agent_instruction
 
 
 config = get_config()
@@ -31,33 +23,32 @@ apply_runtime_env(config)
 
 
 def _root_tools():
-    tools = [
-        detect_intent_tool,
-        fetch_investor_schema_contract_tool,
+    return [
         greeting_tool,
-        unsupported_banking_tool,
-        analyze_search_arguments_tool,
-        search_investors_tool,
+        generate_catalog_sql_query_tool,
     ]
-    if config.dynamic_investor_sql_enabled:
-        tools.append(run_dynamic_investor_sql_tool)
-    return tools
 
 
-def _resolve_agent_model():
+def _root_agent_generate_config() -> genai_types.GenerateContentConfig:
+    """Maps AppConfig LLM knobs into ADK request config.
+
+    Use a string ``model`` id on ``Agent`` (not ``LiteLlm``) so ADK Web ``/dev/build_graph``
+    can serialize the agent graph without hitting ``LiteLLMClient`` pydantic errors.
+    LiteLLM still receives temperature / max tokens via ``LlmRequest.config`` for Bedrock.
+    """
+
     llm = config.llm
-    if llm.uses_bedrock:
-        kwargs = {"temperature": llm.temperature}
-        if llm.max_output_tokens:
-            kwargs["max_tokens"] = llm.max_output_tokens
-        return LiteLlm(model=llm.model, **kwargs)
-    return llm.model
+    gc_kwargs: dict = {"temperature": float(llm.temperature)}
+    if llm.max_output_tokens is not None:
+        gc_kwargs["max_output_tokens"] = int(llm.max_output_tokens)
+    return genai_types.GenerateContentConfig(**gc_kwargs)
 
 
 root_agent = Agent(
-    model=_resolve_agent_model(),
+    model=config.llm.model,  # small/fast Bedrock model (BEDROCK_MODEL_ID / BEDROCK_ROOT_MODEL_ID)
     name="investor_search_agent",
-    description="Routes banking investor-search requests using ADK session state and safe tools.",
+    description="Distributor investor assistant: greeting or catalog-backed SQL generation.",
     instruction=build_root_agent_instruction(),
     tools=_root_tools(),
+    generate_content_config=_root_agent_generate_config(),
 )

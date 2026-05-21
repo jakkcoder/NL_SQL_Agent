@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class InvestorTab(str, Enum):
@@ -111,6 +111,22 @@ class ActivityFilter(BaseModel):
 class SearchPlan(BaseModel):
     investor_tab: InvestorTab = InvestorTab.INDIVIDUAL
     name_search: str | None = None
+    city: str | None = Field(
+        default=None,
+        description="Registered address city on sphmf.customer_master.city (folio-scoped).",
+    )
+    age_min: int | None = Field(
+        default=None,
+        ge=0,
+        le=130,
+        description="Minimum investor age in full years (from public.investor.dob).",
+    )
+    age_max: int | None = Field(
+        default=None,
+        ge=0,
+        le=130,
+        description="Maximum investor age in full years (from public.investor.dob).",
+    )
     eligibility: EligibilityFilter = EligibilityFilter.ALL
     individual_otm: IndividualOtmFilter = IndividualOtmFilter.ALL
     non_individual_otm: NonIndividualOtmFilter = NonIndividualOtmFilter.ALL
@@ -125,10 +141,19 @@ class SearchPlan(BaseModel):
     page_offset: int = 0
     unsupported_reasons: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def align_age_bounds(self) -> SearchPlan:
+        if self.age_min is not None and self.age_max is not None and self.age_min > self.age_max:
+            self.age_min, self.age_max = self.age_max, self.age_min
+        return self
+
     @property
     def has_individual_only_filters(self) -> bool:
         return (
-            self.eligibility != EligibilityFilter.ALL
+            bool(self.city and self.city.strip())
+            or self.age_min is not None
+            or self.age_max is not None
+            or self.eligibility != EligibilityFilter.ALL
             or self.holding.mode != BinaryFilter.ALL
             or self.systematic.mode != BinaryFilter.ALL
             or self.activity.mode != BinaryFilter.ALL
@@ -143,6 +168,9 @@ class SearchPlanLLMOutput(BaseModel):
     investor_tab: InvestorTab
     normalized_query: str
     name_search: str | None = None
+    city: str | None = None
+    age_min: int | None = Field(default=None, ge=0, le=130)
+    age_max: int | None = Field(default=None, ge=0, le=130)
     eligibility: EligibilityFilter = EligibilityFilter.ALL
     individual_otm: IndividualOtmFilter = IndividualOtmFilter.ALL
     non_individual_otm: NonIndividualOtmFilter = NonIndividualOtmFilter.ALL

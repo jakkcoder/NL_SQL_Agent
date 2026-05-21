@@ -1,3 +1,10 @@
+"""Legacy deterministic NL → ``SearchPlan`` mapper.
+
+**Not used by the two-tool ADK root agent** (greeting + catalog SQL generator). This module
+remains for offline tests and dev scripts that need stable ``SearchPlan`` fixtures without
+calling a model.
+"""
+
 import re
 
 from app.models.chat import ChatMessage
@@ -84,11 +91,10 @@ def parse_investor_search_intent(
     page_limit: int = 25,
     page_offset: int = 0,
 ) -> SearchPlan:
-    """Map user text to a constrained SearchPlan.
+    """Map user text to a constrained SearchPlan (tests / scripts only).
 
-    This deterministic parser is intentionally conservative. First-name
-    name_search is not set here; the search-plan LLM supplies it. The ADK agent
-    can call this as a tool, and the validator remains the final authority.
+    The ADK root agent does not use this path; it uses ``generate_catalog_sql_query_tool``.
+    First-name ``name_search`` is not set here.
     """
 
     normalized = _normalize(query)

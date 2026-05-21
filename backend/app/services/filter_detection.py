@@ -1,19 +1,13 @@
-"""Heuristics for whether a user message includes investor search filters."""
+"""Routing hint: whether an investor message likely carries filter semantics.
 
-from app.models.search_plan import InvestorTypeFilter
-from app.services.intent_parser import parse_investor_search_intent
-from app.services.plan_validator import PlanValidator
+Used by ``app.services.routing.classify_message`` to set ``has_search_filters`` on the
+routing state (e.g. for ``greeting_tool`` session bookkeeping). It does **not** parse NL
+into a ``SearchPlan`` and is unrelated to the catalog SQL generator.
+"""
 
 
 def message_has_search_filters(message: str, prior_step: str | None = None) -> bool:
-    """True when the message includes filters beyond a plain investor list."""
+    """Return True when the message should be treated as filter-bearing for routing hints."""
 
-    del prior_step  # Individual-only MVP: no investor-type clarification step.
-    plan = parse_investor_search_intent(message)
-    if not (PlanValidator().has_any_filter(plan) or _plan_has_type_filters(plan)):
-        return False
-    return True
-
-
-def _plan_has_type_filters(plan) -> bool:
-    return plan.investor_type != InvestorTypeFilter.ALL or bool(plan.investor_subtypes)
+    del prior_step  # reserved for session-aware routing extensions
+    return bool((message or "").strip())

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "source": "db+contract",
-  "loaded_at": "2026-05-20T09:40:25.747420+00:00",
+  "loaded_at": "2026-05-21T10:02:55.652754+00:00",
   "filters": {
     "investor_tab": {
       "values": [
@@ -18,7 +18,7 @@
         "YES",
         "NO"
       ],
-      "parameter": "filter_dp_investor_menu.eligibility",
+      "parameter": "individual_warehouse.eligibility",
       "source": "contract"
     },
     "individual_otm": {
@@ -27,7 +27,7 @@
         "Y",
         "NOT_AVAILABLE"
       ],
-      "parameter": "filter_dp_investor_menu.otm",
+      "parameter": "individual_warehouse.otm",
       "source": "contract"
     },
     "non_individual_otm": {
@@ -45,7 +45,7 @@
         "ACTIVE",
         "DORMANT"
       ],
-      "parameter": "filter_dp_investor_menu.investortype",
+      "parameter": "individual_warehouse.investor_type",
       "source": "contract"
     },
     "investor_subtypes": {
@@ -54,7 +54,17 @@
         "MINOR",
         "OTHERS"
       ],
-      "parameter": "filter_dp_investor_menu.investorsubtype",
+      "parameter": "individual_warehouse.investor_subtypes",
+      "source": "contract"
+    },
+    "city": {
+      "values": [],
+      "parameter": "sphmf.customer_master.city",
+      "source": "contract"
+    },
+    "investor_age_years": {
+      "values": [],
+      "parameter": "public.investor.dob (age in full years via AGE)",
       "source": "contract"
     },
     "holding_mode": {
@@ -663,9 +673,6 @@
       "parameter": "sortvalue",
       "source": "contract"
     }
-  },
-  "db_errors": {
-    "scheme_categories": "column sm.category does not exist\nLINE 2:         SELECT DISTINCT sm.category AS value\n                                ^"
   },
   "db_metadata": {
     "payout_mechanisms": [

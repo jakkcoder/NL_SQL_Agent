@@ -1,6 +1,8 @@
 """Build debug-friendly final SQL snapshots for ADK session state."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import Any, Sequence
 
 from app.core.config import AppConfig
 from app.models.agent_state import (
@@ -11,17 +13,80 @@ from app.models.agent_state import (
 from app.models.search_plan import InvestorTab, SearchPlan
 from app.services.individual_executor import IndividualInvestorExecutor
 from app.services.non_individual_executor import NonIndividualInvestorExecutor
-from app.services.search_plan_builder import describe_search_plan
+from app.services.search_plan_describe import describe_search_plan
+
+
+def _postgresql_literal(value: Any) -> str:
+    """Render one value as a PostgreSQL SQL literal (for display / session state only)."""
+
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, list):
+        return "ARRAY[" + ", ".join(_postgresql_literal(item) for item in value) + "]"
+    text = str(value).replace("'", "''")
+    return f"'{text}'"
+
+
+def bind_postgresql_parameters(sql: str, parameters: Sequence[Any]) -> str:
+    """Inline ``%s`` placeholders left-to-right with PostgreSQL literals (``%%`` escaped)."""
+
+    if not parameters:
+        return sql
+    out: list[str] = []
+    idx = 0
+    pidx = 0
+    n = len(sql)
+    while idx < n:
+        if idx < n - 1 and sql[idx] == "%" and sql[idx + 1] == "s":
+            if pidx >= len(parameters):
+                raise ValueError("More %s placeholders than parameters")
+            out.append(_postgresql_literal(parameters[pidx]))
+            pidx += 1
+            idx += 2
+            continue
+        if idx < n - 1 and sql[idx] == "%" and sql[idx + 1] == "%":
+            out.append("%")
+            idx += 2
+            continue
+        out.append(sql[idx])
+        idx += 1
+    if pidx != len(parameters):
+        raise ValueError("Fewer %s placeholders than parameters")
+    return "".join(out)
+
+
+def build_postgresql_executable_sql(sql: str, parameters: Sequence[Any]) -> str:
+    """Normalize whitespace and return a single PostgreSQL statement with literals inlined."""
+
+    normalized = _normalize_sql(sql)
+    if not parameters:
+        return normalized
+    try:
+        return bind_postgresql_parameters(normalized, parameters)
+    except ValueError:
+        return normalized
 
 
 def publish_final_query_to_session(session: dict[str, Any], final_query: dict[str, Any]) -> None:
-    """Store final_query plus top-level last_sql / last_sql_parameters for ADK state viewers."""
+    """Store final_query plus top-level last_sql / last_sql_parameters for ADK state viewers.
+
+    ``last_sql`` is the full PostgreSQL query with parameter values inlined (not ``%s``).
+    ``final_query["sql"]`` keeps the parameterized form; ``sql_postgresql`` is the inlined form.
+    """
 
     session[STATE_KEY_FINAL_QUERY] = final_query
     sql = final_query.get("sql")
+    params = final_query.get("parameters")
     if isinstance(sql, str) and sql.strip():
-        session[STATE_KEY_LAST_SQL] = sql
-        session[STATE_KEY_LAST_SQL_PARAMETERS] = final_query.get("parameters")
+        param_list = list(params) if isinstance(params, list) else []
+        if "sql_postgresql" not in final_query:
+            final_query["sql_postgresql"] = build_postgresql_executable_sql(sql, param_list)
+        session[STATE_KEY_LAST_SQL] = final_query["sql_postgresql"]
+        session[STATE_KEY_LAST_SQL_PARAMETERS] = param_list
         return
 
     statements = final_query.get("statements") or []
@@ -39,16 +104,37 @@ def publish_final_query_to_session(session: dict[str, Any], final_query: dict[st
     session.pop(STATE_KEY_LAST_SQL_PARAMETERS, None)
 
 
-def build_final_query(plan: SearchPlan, arn_code: str, config: AppConfig) -> dict[str, Any]:
+def build_final_query(
+    plan: SearchPlan,
+    arn_code: str,
+    config: AppConfig,
+    session_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return the SQL the executor would run (for ADK State / local debugging)."""
 
     summary = describe_search_plan(plan)
     if plan.investor_tab == InvestorTab.INDIVIDUAL:
-        sql, params = IndividualInvestorExecutor.build_query(plan, arn_code)
+        if config.dev_use_sqlite_investor_search:
+            from app.services.dev_sqlite_investor_search import (
+                build_sqlite_dev_list_sql,
+                plan_supported_on_sqlite_dev_mirror,
+            )
+
+            if plan_supported_on_sqlite_dev_mirror(plan):
+                sql, params = build_sqlite_dev_list_sql(plan, arn_code)
+                return {
+                    "engine": "individual_sqlite_mirror_dev",
+                    "investor_tab": InvestorTab.INDIVIDUAL.value,
+                    "combination_strategy": "sqlite_dev_default_list",
+                    "sql": _normalize_sql(sql),
+                    "parameters": _json_safe_params(params),
+                    "normalized_summary": summary,
+                }
+        sql, params = IndividualInvestorExecutor.build_query(plan, arn_code, session_state=session_state)
         return {
-            "engine": "filter_dp_investor_menu",
+            "engine": "individual_warehouse_catalog",
             "investor_tab": InvestorTab.INDIVIDUAL.value,
-            "combination_strategy": "single_function",
+            "combination_strategy": "warehouse_select",
             "sql": _normalize_sql(sql),
             "parameters": _json_safe_params(params),
             "normalized_summary": summary,

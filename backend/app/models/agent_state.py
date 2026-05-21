@@ -30,6 +30,14 @@ STATE_KEY_PLAN_VALIDATION_STATUS = "plan_validation_status"
 STATE_KEY_INVESTOR_SCHEMA_CONTRACT_COMPACT = "investor_schema_contract_compact"
 STATE_KEY_INVESTOR_SCHEMA_CONTRACT_META = "investor_schema_contract_meta"
 STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED = "investor_schema_session_fetched"
+# Filter catalog JSON (``filters`` + metadata) materialized once per session for validation/SQL.
+STATE_KEY_FILTER_CATALOG_SNAPSHOT = "filter_catalog_snapshot"
+STATE_KEY_FILTER_CATALOG_SESSION_FETCHED = "filter_catalog_session_fetched"
+# Two-step query flow (small router LLM + large catalog SQL generator) — append-only trace + last payloads
+STATE_KEY_QUERY_FLOW_TRACE = "query_flow_trace"
+STATE_KEY_QUERY_FLOW_ROUTER_LAST = "query_flow_router_last"
+STATE_KEY_QUERY_GENERATOR_LAST = "catalog_query_generator_last"
+STATE_KEY_QUERY_FLOW_LAST_ROUTE = "query_flow_last_route"
 
 # Invocation-scoped keys (ADK temp: prefix; not persisted across turns).
 STATE_KEY_TEMP_DETECTED_INTENT = "temp:detected_intent"
@@ -160,3 +168,27 @@ class InvestorSchemaFetchToolOutput(StrictSchemaModel):
     table_count: int = 0
     column_count: int = 0
     session_state_keys_written: list[str] = Field(default_factory=list)
+
+
+class QueryFlowRouterToolOutput(StrictSchemaModel):
+    """Result of ``route_user_query_flow_tool`` (small LLM)."""
+
+    status: Literal["ok", "error"] = "ok"
+    route: Literal["greeting", "filter_search", "data_sql"]
+    reply: str
+    router_model: str = ""
+    error: str | None = None
+
+
+class GenerateCatalogSqlToolOutput(StrictSchemaModel):
+    """Result of ``generate_catalog_sql_query_tool`` (LLM-generated SQL only; not executed)."""
+
+    status: Literal["ok", "error", "blocked"] = "ok"
+    reply: str
+    thought: str | None = None
+    sql: str | None = None
+    parameters: list[Any] = Field(default_factory=list)
+    row_count: int = 0
+    generator_model: str = ""
+    validation_error: str | None = None
+    execute_error: str | None = None

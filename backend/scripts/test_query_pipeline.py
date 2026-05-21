@@ -24,7 +24,7 @@ from app.services.non_individual_executor import NonIndividualInvestorExecutor
 from app.services.plan_validator import PlanValidator
 from app.services.query_arguments import plan_to_query_arguments
 
-# Run CSV-aligned checks: pytest tests/test_individual_csv_mapping.py -q
+# Example NL coverage: pytest tests/test_example_queries_sql.py tests/test_example_queries_adk_state.py -q
 
 SAMPLE_QUERIES = [
     ("individual default", "show individual investors"),

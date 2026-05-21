@@ -1,112 +1,31 @@
 from typing import Any
 
 from app.db.postgres import PostgresClient
-from app.models.search_plan import (
-    BinaryFilter,
-    SearchPlan,
-)
+from app.models.search_plan import SearchPlan
+from app.services.individual_warehouse_sql import build_warehouse_individual_sql
 
 
 class IndividualInvestorExecutor:
-    """Executes Individual investor searches through filter_dp_investor_menu()."""
+    """Executes Individual investor searches via catalog-driven warehouse SQL."""
 
     def __init__(self, db: PostgresClient) -> None:
         self._db = db
 
-    def execute(self, plan: SearchPlan, arn_code: str) -> list[dict[str, Any]]:
-        function_sql, params = self.build_query(plan, arn_code)
-        return self._db.fetch_all(function_sql, params)
+    def execute(
+        self,
+        plan: SearchPlan,
+        arn_code: str,
+        session_state: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        sql, params = self.build_query(plan, arn_code, session_state=session_state)
+        return self._db.fetch_all(sql, params)
 
     @staticmethod
-    def build_query(plan: SearchPlan, arn_code: str) -> tuple[str, list[Any]]:
+    def build_query(
+        plan: SearchPlan,
+        arn_code: str,
+        session_state: dict[str, Any] | None = None,
+    ) -> tuple[str, list[Any]]:
         """Return SQL and parameters without executing (for session-state debugging)."""
 
-        return IndividualInvestorExecutor._build_function_call(plan, arn_code)
-
-    @staticmethod
-    def _build_function_call(plan: SearchPlan, arn_code: str) -> tuple[str, list[Any]]:
-        params: list[Any] = [
-            arn_code,
-            plan.eligibility.value,
-            plan.individual_otm.value,
-            plan.investor_type.value,
-            [subtype.value for subtype in plan.investor_subtypes],
-        ]
-
-        holding_sql = IndividualInvestorExecutor._holding_sql(plan, params)
-        systematic_sql = IndividualInvestorExecutor._systematic_sql(plan, params)
-        activity_sql = IndividualInvestorExecutor._activity_sql(plan, params)
-
-        params.extend(
-            [
-                _search_text(plan.name_search),
-                plan.sort_key,
-                plan.sort_order,
-                plan.page_limit,
-                plan.page_offset,
-                "Y",
-            ]
-        )
-
-        sql = f"""
-            SELECT *
-            FROM filter_dp_investor_menu(
-                %s,
-                %s,
-                %s,
-                %s,
-                %s::TEXT[],
-                {holding_sql},
-                {systematic_sql},
-                {activity_sql},
-                %s,
-                %s,
-                %s,
-                %s,
-                %s,
-                %s
-            )
-        """
-        return sql, params
-
-    @staticmethod
-    def _holding_sql(plan: SearchPlan, params: list[Any]) -> str:
-        if plan.holding.mode == BinaryFilter.ALL:
-            return "NULL"
-        params.extend([plan.holding.mode.value, plan.holding.schemes, plan.holding.inv_options])
-        return "ROW(%s, %s::TEXT[], %s::TEXT[])::current_holdings"
-
-    @staticmethod
-    def _systematic_sql(plan: SearchPlan, params: list[Any]) -> str:
-        if plan.systematic.mode == BinaryFilter.ALL:
-            return "NULL"
-        params.extend(
-            [
-                plan.systematic.mode.value,
-                plan.systematic.plans,
-                plan.systematic.schemes,
-                plan.systematic.inv_options,
-            ]
-        )
-        return "ROW(%s, %s::TEXT[], %s::TEXT[], %s::TEXT[])::systematic_plan"
-
-    @staticmethod
-    def _activity_sql(plan: SearchPlan, params: list[Any]) -> str:
-        if plan.activity.mode == BinaryFilter.ALL:
-            return "NULL"
-        params.extend(
-            [
-                plan.activity.mode.value,
-                plan.activity.activity_types,
-                plan.activity.schemes,
-                plan.activity.inv_options,
-                plan.activity.duration,
-            ]
-        )
-        return "ROW(%s, %s::TEXT[], %s::TEXT[], %s::TEXT[], %s)::investor_activity"
-
-
-def _search_text(name_search: str | None) -> str | None:
-    if not name_search:
-        return None
-    return f"%{name_search.lower()}%"
+        return build_warehouse_individual_sql(plan, arn_code, session_state=session_state)
