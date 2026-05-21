@@ -14,10 +14,17 @@ class IndividualInvestorExecutor:
         self._db = db
 
     def execute(self, plan: SearchPlan, arn_code: str) -> list[dict[str, Any]]:
-        function_sql, params = self._build_function_call(plan, arn_code)
+        function_sql, params = self.build_query(plan, arn_code)
         return self._db.fetch_all(function_sql, params)
 
-    def _build_function_call(self, plan: SearchPlan, arn_code: str) -> tuple[str, list[Any]]:
+    @staticmethod
+    def build_query(plan: SearchPlan, arn_code: str) -> tuple[str, list[Any]]:
+        """Return SQL and parameters without executing (for session-state debugging)."""
+
+        return IndividualInvestorExecutor._build_function_call(plan, arn_code)
+
+    @staticmethod
+    def _build_function_call(plan: SearchPlan, arn_code: str) -> tuple[str, list[Any]]:
         params: list[Any] = [
             arn_code,
             plan.eligibility.value,
@@ -26,9 +33,9 @@ class IndividualInvestorExecutor:
             [subtype.value for subtype in plan.investor_subtypes],
         ]
 
-        holding_sql = self._holding_sql(plan, params)
-        systematic_sql = self._systematic_sql(plan, params)
-        activity_sql = self._activity_sql(plan, params)
+        holding_sql = IndividualInvestorExecutor._holding_sql(plan, params)
+        systematic_sql = IndividualInvestorExecutor._systematic_sql(plan, params)
+        activity_sql = IndividualInvestorExecutor._activity_sql(plan, params)
 
         params.extend(
             [
@@ -62,13 +69,15 @@ class IndividualInvestorExecutor:
         """
         return sql, params
 
-    def _holding_sql(self, plan: SearchPlan, params: list[Any]) -> str:
+    @staticmethod
+    def _holding_sql(plan: SearchPlan, params: list[Any]) -> str:
         if plan.holding.mode == BinaryFilter.ALL:
             return "NULL"
         params.extend([plan.holding.mode.value, plan.holding.schemes, plan.holding.inv_options])
         return "ROW(%s, %s::TEXT[], %s::TEXT[])::current_holdings"
 
-    def _systematic_sql(self, plan: SearchPlan, params: list[Any]) -> str:
+    @staticmethod
+    def _systematic_sql(plan: SearchPlan, params: list[Any]) -> str:
         if plan.systematic.mode == BinaryFilter.ALL:
             return "NULL"
         params.extend(
@@ -81,7 +90,8 @@ class IndividualInvestorExecutor:
         )
         return "ROW(%s, %s::TEXT[], %s::TEXT[], %s::TEXT[])::systematic_plan"
 
-    def _activity_sql(self, plan: SearchPlan, params: list[Any]) -> str:
+    @staticmethod
+    def _activity_sql(plan: SearchPlan, params: list[Any]) -> str:
         if plan.activity.mode == BinaryFilter.ALL:
             return "NULL"
         params.extend(

@@ -1,6 +1,7 @@
 from enum import Enum
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class InvestorTab(str, Enum):
@@ -108,7 +109,7 @@ class ActivityFilter(BaseModel):
 
 
 class SearchPlan(BaseModel):
-    investor_tab: InvestorTab = InvestorTab.UNKNOWN
+    investor_tab: InvestorTab = InvestorTab.INDIVIDUAL
     name_search: str | None = None
     eligibility: EligibilityFilter = EligibilityFilter.ALL
     individual_otm: IndividualOtmFilter = IndividualOtmFilter.ALL
@@ -132,3 +133,33 @@ class SearchPlan(BaseModel):
             or self.systematic.mode != BinaryFilter.ALL
             or self.activity.mode != BinaryFilter.ALL
         )
+
+
+class SearchPlanLLMOutput(BaseModel):
+    """Strict JSON contract returned by the search-plan LLM builder."""
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    investor_tab: InvestorTab
+    normalized_query: str
+    name_search: str | None = None
+    eligibility: EligibilityFilter = EligibilityFilter.ALL
+    individual_otm: IndividualOtmFilter = IndividualOtmFilter.ALL
+    non_individual_otm: NonIndividualOtmFilter = NonIndividualOtmFilter.ALL
+    investor_type: InvestorTypeFilter = InvestorTypeFilter.ALL
+    investor_subtypes: list[InvestorSubtype] = Field(default_factory=list)
+    holding_mode: BinaryFilter = BinaryFilter.ALL
+    systematic_mode: BinaryFilter = BinaryFilter.ALL
+    systematic_plans: list[str] = Field(default_factory=list)
+    activity_mode: BinaryFilter = BinaryFilter.ALL
+    activity_types: list[str] = Field(default_factory=list)
+    activity_duration: str = "1 month"
+    unsupported_reasons: list[str] = Field(default_factory=list)
+    plan_source: Literal["llm"] = "llm"
+
+    @field_validator("activity_duration", mode="before")
+    @classmethod
+    def default_activity_duration(cls, value: str | None) -> str:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return "1 month"
+        return str(value).strip().lower()

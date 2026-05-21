@@ -19,6 +19,6 @@ if missing_config:
 app: FastAPI = get_fast_api_app(
     agents_dir=str(AGENTS_DIR),
     allow_origins=config.security.allowed_origins,
-    web=False,
+    web=config.serve_adk_web_ui,
     auto_create_session=True,
 )

@@ -9,6 +9,7 @@ from app.models.search_plan import (
     NonIndividualOtmFilter,
     SearchPlan,
 )
+from app.services.filter_catalog import get_filter_catalog
 
 
 @dataclass(frozen=True)
@@ -34,16 +35,28 @@ class PlanValidator:
         if plan.unsupported_reasons:
             return ValidationResult(status="out_of_scope", message=" ".join(plan.unsupported_reasons))
 
-        if plan.investor_tab == InvestorTab.UNKNOWN:
+        if plan.investor_tab == InvestorTab.NON_INDIVIDUAL:
             return ValidationResult(
-                status="clarification",
-                message="Are you looking for Individual investors or Non-Individual investors?",
+                status="out_of_scope",
+                message=(
+                    "Non-Individual investor search is not available in this MVP. "
+                    "I can help with Individual investor search only."
+                ),
             )
 
-        if plan.activity.duration not in ALLOWED_DURATIONS:
+        catalog = get_filter_catalog()
+        allowed_durations = set(catalog.get_values("activity_duration")) or ALLOWED_DURATIONS
+        if plan.activity.duration not in allowed_durations:
             return ValidationResult(
                 status="out_of_scope",
                 message="That duration is not supported. Use 1, 2, 3, or 6 months; 1, 2, or 3 years; or this financial year.",
+            )
+
+        invalid_scheme = self._first_invalid_scheme(plan)
+        if invalid_scheme:
+            return ValidationResult(
+                status="out_of_scope",
+                message=f"Scheme code '{invalid_scheme}' is not in the allowed catalog. Use ALL or a valid scheme from the distributor menu.",
             )
 
         if plan.investor_tab == InvestorTab.NON_INDIVIDUAL and plan.has_individual_only_filters:
@@ -53,6 +66,16 @@ class PlanValidator:
             )
 
         return ValidationResult(status="valid")
+
+    def _first_invalid_scheme(self, plan: SearchPlan) -> str | None:
+        catalog = get_filter_catalog()
+        for schemes in (plan.holding.schemes, plan.systematic.schemes, plan.activity.schemes):
+            for scheme in schemes:
+                if scheme == "ALL":
+                    continue
+                if not catalog.allows("scheme_codes", scheme):
+                    return scheme
+        return None
 
     def has_any_filter(self, plan: SearchPlan) -> bool:
         return (

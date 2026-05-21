@@ -46,6 +46,8 @@ class DatabaseConfig(BaseModel):
     statement_timeout_ms: int
     pool_min_size: int
     pool_max_size: int
+    connect_timeout_seconds: int = 5
+    pool_timeout_seconds: int = 10
     environment: str = "dev"
 
 
@@ -84,15 +86,22 @@ class AppConfig(BaseSettings):
     dev_db_statement_timeout_ms: int = Field(default=15000, alias="DEV_DB_STATEMENT_TIMEOUT_MS")
     dev_db_pool_min_size: int = Field(default=1, alias="DEV_DB_POOL_MIN_SIZE")
     dev_db_pool_max_size: int = Field(default=4, alias="DEV_DB_POOL_MAX_SIZE")
+    dev_db_connect_timeout_seconds: int = Field(default=5, alias="DEV_DB_CONNECT_TIMEOUT_SECONDS")
+    dev_db_pool_timeout_seconds: int = Field(default=10, alias="DEV_DB_POOL_TIMEOUT_SECONDS")
 
     prod_database_url: SecretStr | None = Field(default=None, alias="PROD_DATABASE_URL")
     prod_db_statement_timeout_ms: int = Field(default=15000, alias="PROD_DB_STATEMENT_TIMEOUT_MS")
     prod_db_pool_min_size: int = Field(default=2, alias="PROD_DB_POOL_MIN_SIZE")
     prod_db_pool_max_size: int = Field(default=10, alias="PROD_DB_POOL_MAX_SIZE")
+    prod_db_connect_timeout_seconds: int = Field(default=5, alias="PROD_DB_CONNECT_TIMEOUT_SECONDS")
+    prod_db_pool_timeout_seconds: int = Field(default=10, alias="PROD_DB_POOL_TIMEOUT_SECONDS")
 
     default_dev_arn: str = Field(default="ARN-0411", alias="DEFAULT_DEV_ARN")
     default_page_limit: int = Field(default=25, alias="DEFAULT_PAGE_LIMIT")
     max_intersection_rows: int = Field(default=5000, alias="MAX_INTERSECTION_ROWS")
+
+    dynamic_investor_sql_enabled: bool = Field(default=False, alias="DYNAMIC_INVESTOR_SQL_ENABLED")
+    dynamic_sql_llm_model: str | None = Field(default=None, alias="DYNAMIC_SQL_LLM_MODEL")
 
     llm_provider: str = Field(default="bedrock", alias="LLM_PROVIDER")
     bedrock_model_id: str = Field(
@@ -115,6 +124,9 @@ class AppConfig(BaseSettings):
     aws_profile: str | None = Field(default=None, alias="AWS_PROFILE")
     aws_role_arn: str | None = Field(default=None, alias="AWS_ROLE_ARN")
     aws_secrets_manager_prefix: str | None = Field(default=None, alias="AWS_SECRETS_MANAGER_PREFIX")
+
+    filter_catalog_path: str | None = Field(default=None, alias="FILTER_CATALOG_PATH")
+    adk_web_ui: bool | None = Field(default=None, alias="ADK_WEB_UI")
 
     allowed_origins: str = Field(
         default="http://localhost:8000,http://localhost:3000,http://127.0.0.1:5500,null",
@@ -140,6 +152,7 @@ class AppConfig(BaseSettings):
         "aws_role_arn",
         "aws_secrets_manager_prefix",
         "llm_max_output_tokens",
+        "dynamic_sql_llm_model",
         mode="before",
     )
     @classmethod
@@ -157,12 +170,22 @@ class AppConfig(BaseSettings):
         )
 
     @property
+    def serve_adk_web_ui(self) -> bool:
+        """Serve ADK chat UI at /dev-ui (and redirect / → /dev-ui/) when True."""
+
+        if self.adk_web_ui is not None:
+            return self.adk_web_ui
+        return self.runtime.is_development
+
+    @property
     def dev_database(self) -> DatabaseConfig:
         return DatabaseConfig(
             url=self.dev_database_url,
             statement_timeout_ms=self.dev_db_statement_timeout_ms,
             pool_min_size=self.dev_db_pool_min_size,
             pool_max_size=self.dev_db_pool_max_size,
+            connect_timeout_seconds=self.dev_db_connect_timeout_seconds,
+            pool_timeout_seconds=self.dev_db_pool_timeout_seconds,
             environment="dev",
         )
 
@@ -173,6 +196,8 @@ class AppConfig(BaseSettings):
             statement_timeout_ms=self.prod_db_statement_timeout_ms,
             pool_min_size=self.prod_db_pool_min_size,
             pool_max_size=self.prod_db_pool_max_size,
+            connect_timeout_seconds=self.prod_db_connect_timeout_seconds,
+            pool_timeout_seconds=self.prod_db_pool_timeout_seconds,
             environment="prod",
         )
 
@@ -235,6 +260,19 @@ class AppConfig(BaseSettings):
     def database_url_value(self) -> str | None:
         active = self.database.url
         return active.get_secret_value() if active else None
+
+    @property
+    def dynamic_sql_llm_model_resolved(self) -> str:
+        """Model id for dynamic SQL ReAct engine (LiteLLM format, e.g. bedrock/...)."""
+
+        if self.dynamic_sql_llm_model and self.dynamic_sql_llm_model.strip():
+            raw = self.dynamic_sql_llm_model.strip()
+            if self.llm_provider.lower() in {"bedrock", "aws-bedrock", "aws_bedrock"} and not raw.startswith(
+                "bedrock/"
+            ):
+                return f"bedrock/{raw}"
+            return raw
+        return self.llm.model
 
     @property
     def dev_database_url_value(self) -> str | None:
@@ -303,13 +341,21 @@ def apply_runtime_env(config: AppConfig | None = None) -> None:
     os.environ["AWS_DEFAULT_REGION"] = aws.region
     os.environ["AWS_REGION_NAME"] = aws.region
 
-    if aws.access_key_id:
-        os.environ["AWS_ACCESS_KEY_ID"] = aws.access_key_id.get_secret_value()
-    if aws.secret_access_key:
-        os.environ["AWS_SECRET_ACCESS_KEY"] = aws.secret_access_key.get_secret_value()
-    if aws.session_token:
-        os.environ["AWS_SESSION_TOKEN"] = aws.session_token.get_secret_value()
-    if aws.profile:
+    # Do not export placeholder .env values — they override ~/.aws/credentials from `aws configure`.
+    for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"):
+        os.environ.pop(key, None)
+
+    access_key = aws.access_key_id.get_secret_value() if aws.access_key_id else None
+    secret_key = aws.secret_access_key.get_secret_value() if aws.secret_access_key else None
+    session_token = aws.session_token.get_secret_value() if aws.session_token else None
+
+    if _has_real_value(access_key):
+        os.environ["AWS_ACCESS_KEY_ID"] = access_key
+    if _has_real_value(secret_key):
+        os.environ["AWS_SECRET_ACCESS_KEY"] = secret_key
+    if _has_real_value(session_token):
+        os.environ["AWS_SESSION_TOKEN"] = session_token
+    if _has_real_value(aws.profile):
         os.environ["AWS_PROFILE"] = aws.profile
 
 

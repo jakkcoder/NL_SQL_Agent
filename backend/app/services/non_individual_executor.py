@@ -38,6 +38,58 @@ class NonIndividualInvestorExecutor:
             result_sets.append(self._db.fetch_all(sql, params))
         return self._intersect_and_page(result_sets, plan.page_limit, plan.page_offset)
 
+    @staticmethod
+    def build_query_statements(
+        plan: SearchPlan,
+        arn_code: str,
+        *,
+        max_intersection_rows: int,
+    ) -> list[dict[str, Any]]:
+        """Return SQL snapshots per template without executing (for session-state debugging)."""
+
+        executor = object.__new__(NonIndividualInvestorExecutor)
+        template_names = executor._template_names(plan)
+        if not template_names:
+            sql, params = executor._build_query(
+                "default", plan, arn_code, plan.page_limit, plan.page_offset
+            )
+            return [
+                {
+                    "template": "default",
+                    "combination_strategy": "default",
+                    "sql": _normalize_sql(sql),
+                    "parameters": params,
+                }
+            ]
+
+        if len(template_names) == 1:
+            sql, params = executor._build_query(
+                template_names[0], plan, arn_code, plan.page_limit, plan.page_offset
+            )
+            return [
+                {
+                    "template": template_names[0],
+                    "combination_strategy": "single_template",
+                    "sql": _normalize_sql(sql),
+                    "parameters": params,
+                }
+            ]
+
+        statements: list[dict[str, Any]] = []
+        for template_name in template_names:
+            sql, params = executor._build_query(
+                template_name, plan, arn_code, max_intersection_rows, 0
+            )
+            statements.append(
+                {
+                    "template": template_name,
+                    "combination_strategy": "intersect_templates",
+                    "sql": _normalize_sql(sql),
+                    "parameters": params,
+                }
+            )
+        return statements
+
     def _template_names(self, plan: SearchPlan) -> list[str]:
         names: list[str] = []
         if plan.non_individual_otm == NonIndividualOtmFilter.YES:
@@ -314,3 +366,7 @@ def _search_text(name_search: str | None) -> str:
     if not name_search:
         return ""
     return f"%{name_search.lower()}%"
+
+
+def _normalize_sql(sql: str) -> str:
+    return " ".join(sql.split())

@@ -9,12 +9,12 @@ from app.services.intent_parser import parse_investor_search_intent
 from app.services.plan_validator import PlanValidator
 
 
-def test_generic_investor_query_needs_clarification():
+def test_generic_investor_query_defaults_to_individual():
     plan = parse_investor_search_intent("Show me my investors")
     result = PlanValidator().validate(plan)
 
-    assert plan.investor_tab == InvestorTab.UNKNOWN
-    assert result.status == "clarification"
+    assert plan.investor_tab == InvestorTab.INDIVIDUAL
+    assert result.can_execute
 
 
 def test_individual_active_otm_name_query():
@@ -25,14 +25,14 @@ def test_individual_active_otm_name_query():
     assert plan.investor_tab == InvestorTab.INDIVIDUAL
     assert plan.investor_type == InvestorTypeFilter.ACTIVE
     assert plan.individual_otm == IndividualOtmFilter.YES
-    assert plan.name_search == "rahul"
+    assert plan.name_search is None
 
 
 def test_non_individual_dormant_without_otm_query():
     plan = parse_investor_search_intent("Show dormant non-individual investors without OTM")
     result = PlanValidator().validate(plan)
 
-    assert result.can_execute
+    assert result.status == "out_of_scope"
     assert plan.investor_tab == InvestorTab.NON_INDIVIDUAL
     assert plan.investor_type == InvestorTypeFilter.DORMANT
     assert plan.non_individual_otm == NonIndividualOtmFilter.NO
