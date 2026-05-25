@@ -8,6 +8,9 @@ const DEFAULTS = {
   token: "",
 };
 
+/** Complex catalog SQL (SIP/holdings) can take 1–3 minutes end-to-end. */
+const RUN_REQUEST_TIMEOUT_MS = 240_000;
+
 const els = {
   chatLog: document.getElementById("chat-log"),
   chatForm: document.getElementById("chat-form"),
@@ -119,6 +122,46 @@ function appendMessage(role, content, { isError = false, rows = [], count = 0, p
   scrollToBottom();
 }
 
+function humanizeColumn(key) {
+  return String(key)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function columnsForRows(rows) {
+  const preferred = [
+    ["first_name", "First name"],
+    ["last_name", "Last name"],
+    ["email", "Email"],
+    ["city", "City"],
+    ["pan_number", "PAN"],
+    ["mobile_number", "Mobile"],
+    ["folio_number", "Folio"],
+    ["dob", "DOB"],
+    ["otm", "OTM"],
+  ];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return preferred;
+  }
+  const keys = new Set();
+  for (const row of rows) {
+    if (row && typeof row === "object") {
+      Object.keys(row).forEach((k) => keys.add(k));
+    }
+  }
+  const ordered = [];
+  for (const [key, label] of preferred) {
+    if (keys.has(key)) {
+      ordered.push([key, label]);
+      keys.delete(key);
+    }
+  }
+  for (const key of [...keys].sort()) {
+    ordered.push([key, humanizeColumn(key)]);
+  }
+  return ordered.length > 0 ? ordered : preferred;
+}
+
 function createRowsTable(rows, count, page) {
   const container = document.createElement("div");
   container.className = "table-card";
@@ -137,15 +180,7 @@ function createRowsTable(rows, count, page) {
   const table = document.createElement("table");
   table.className = "results-table";
 
-  const columns = [
-    ["first_name", "Name"],
-    ["pan_number", "PAN"],
-    ["dob", "DOB"],
-    ["email", "Email"],
-    ["mobile_number", "Mobile"],
-    ["folio_number", "Folio"],
-    ["otm", "OTM"],
-  ];
+  const columns = columnsForRows(rows);
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
@@ -188,8 +223,18 @@ function formatCell(value) {
   return String(value);
 }
 
-function extractReplyFromEvents(events) {
-  if (!Array.isArray(events) || events.length === 0) {
+function normalizeRunEvents(data) {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") {
+    if (Array.isArray(data.events)) return data.events;
+    if (data.content?.parts) return [data];
+  }
+  return [];
+}
+
+function extractReplyFromEvents(data) {
+  const events = normalizeRunEvents(data);
+  if (events.length === 0) {
     return { content: "No response events returned." };
   }
 
@@ -199,19 +244,26 @@ function extractReplyFromEvents(events) {
   for (const event of events) {
     const parts = event?.content?.parts || [];
     for (const part of parts) {
-      const toolReply = part?.functionResponse?.response?.reply;
-      if (typeof toolReply === "string" && toolReply.trim()) {
-        const response = part.functionResponse.response;
-        const rows = response.rows || [];
-        toolReplies.push({
-          content: rows.length > 0 ? "" : toolReply.trim(),
-          rows,
-          count: response.count || 0,
-          page: response.page || null,
-        });
-      }
       if (typeof part?.text === "string" && part.text.trim()) {
         textReplies.push(part.text.trim());
+      }
+
+      const response = part?.functionResponse?.response;
+      if (!response || typeof response !== "object") {
+        continue;
+      }
+      const toolReply = response.reply;
+      const rows = Array.isArray(response.rows) ? response.rows : [];
+      const hasReply = typeof toolReply === "string" && toolReply.trim();
+      if (hasReply || rows.length > 0) {
+        const count =
+          response.count ?? response.row_count ?? (rows.length > 0 ? rows.length : 0);
+        toolReplies.push({
+          content: hasReply ? toolReply.trim() : "",
+          rows,
+          count,
+          page: response.page || null,
+        });
       }
     }
   }
@@ -223,7 +275,7 @@ function extractReplyFromEvents(events) {
     return { content: textReplies[textReplies.length - 1] };
   }
 
-  return { content: JSON.stringify(events[events.length - 1], null, 2) };
+  return { content: "No assistant reply found in ADK events." };
 }
 
 async function testBackendConnection(settings) {
@@ -253,6 +305,7 @@ async function sendToBot(userText, settings) {
   const response = await fetch(apiUrl(settings, "/run"), {
     method: "POST",
     headers: authHeaders(settings),
+    signal: AbortSignal.timeout(RUN_REQUEST_TIMEOUT_MS),
     body: JSON.stringify({
       appName: settings.appName,
       userId: settings.userId,
@@ -300,7 +353,9 @@ async function handleSubmit(event) {
   isSending = true;
   els.sendBtn.disabled = true;
   els.userInput.disabled = true;
-  setStatus("Waiting for bot…");
+  setStatus(
+    "Waiting for bot… (complex SIP/holdings queries may take 1–3 minutes: SQL generation + warehouse)"
+  );
 
   try {
     const reply = await sendToBot(text, settings);
@@ -312,10 +367,17 @@ async function handleSubmit(event) {
     });
     setStatus("");
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Request failed";
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
+    const msg = isTimeout
+      ? "Request timed out after 4 minutes. The warehouse query may be too heavy — try a narrower filter or increase DEV_DB_STATEMENT_TIMEOUT_MS."
+      : err instanceof Error
+        ? err.message
+        : "Request failed";
     appendMessage("assistant", msg, { isError: true });
     setStatus(
-      "Could not reach the backend. Confirm uvicorn is running and CORS allows this origin.",
+      isTimeout
+        ? "Timed out waiting for /run."
+        : "Could not reach the backend. Confirm uvicorn is running and CORS allows this origin.",
       true
     );
     conversation.pop();

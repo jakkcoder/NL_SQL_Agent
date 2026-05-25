@@ -8,3 +8,5 @@ backend/.env
 backend/.adk/
 backend/app/.adk/
 backend/app/agents/**/.adk/
+# Local SQLite demo (see scripts/init_dev_sqlite_demo.py)
+backend/app/data/dev_investor_demo.sqlite
