@@ -1,0 +1,395 @@
+{
+  "module_id": "banking_otm",
+  "summary": "OTM / bank mandate via multiple_bank and payout_mechanism (optional).",
+  "tables": [
+    {
+      "fully_qualified": "public.payout_mechanism",
+      "purpose": "Payment mechanism lookup; filter OTM-capable pay_mech rows (otm_flag, active_flag).",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 5,
+      "columns_documented": 5,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "active_flag",
+          "type": "boolean",
+          "nullable": "NO",
+          "description": "boolean/char flag; boolean"
+        },
+        {
+          "name": "otm_flag",
+          "type": "boolean",
+          "nullable": "NO",
+          "description": "boolean/char flag; boolean"
+        },
+        {
+          "name": "created_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": "NO",
+          "description": "uuid"
+        },
+        {
+          "name": "pay_mech",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        }
+      ],
+      "sample_row": {
+        "active_flag": true,
+        "otm_flag": true,
+        "created_date": "2020-08-31T09:42:40.841376",
+        "id": "67ac458e-46c6-4dc7-8220-1b97146ed695",
+        "pay_mech": "OTM"
+      },
+      "sample_row_note": null
+    },
+    {
+      "fully_qualified": "sphmf.multiple_bank",
+      "purpose": "Bank/mandate rows per folio (folio_no); used for OTM (om_umrn, paymech, cease_dt).",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 50,
+      "columns_documented": 45,
+      "columns_omitted": 5,
+      "columns": [
+        {
+          "name": "broker_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "distributor ARN / broker code for row scope; character varying nullable"
+        },
+        {
+          "name": "cease_dt",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "city",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "city name for geography filters (e.g. Mumbai); character varying nullable"
+        },
+        {
+          "name": "folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "om_umrn",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "OTM UMRN registration; character varying nullable"
+        },
+        {
+          "name": "paymech",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "payment mechanism code (join payout_mechanism); character varying nullable"
+        },
+        {
+          "name": "ac_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "ac_type",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "acno_valid",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "ae_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "arn_emp_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "bank_country",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_micr",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_pincode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_state",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_swft",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bkadd1",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bkadd2",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bkadd3",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "branch_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "debit_type",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "euin_opted",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "identifier",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "ifsccode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "imps_ac_verified",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "micr_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "minor_bank_whitelist_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "mobile_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "neftcode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "om_expiry_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "om_expiry_date_n",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "timestamp with time zone nullable"
+        },
+        {
+          "name": "om_max_amount",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "om_max_amount_n",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "om_pref_open_mandate",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "om_reg_confirm_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "om_regn_mode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "om_start_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "om_start_date_n",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "timestamp with time zone nullable"
+        },
+        {
+          "name": "om_status",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "om_status_old",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "otm_frequency",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "payout_purpose",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "regn_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        }
+      ],
+      "sample_row": {
+        "broker_code": null,
+        "cease_dt": null,
+        "city": "MUMBAI",
+        "folio_no": "14420488",
+        "om_umrn": "UMRN123456789",
+        "paymech": "NACH",
+        "ac_no": "123456789012",
+        "ac_type": "SB",
+        "acno_valid": null,
+        "ae_code": null,
+        "arn_emp_code": null,
+        "bank_country": null,
+        "bank_micr": null,
+        "bank_name": "HDFC BANK",
+        "bank_pincode": null,
+        "bank_state": null,
+        "bank_swft": null,
+        "bkadd1": null,
+        "bkadd2": null,
+        "bkadd3": null,
+        "branch_name": "MUMBAI MAIN",
+        "commit_scn": null,
+        "debit_type": null,
+        "euin_opted": null,
+        "identifier": 9362714,
+        "ifsccode": "HDFC0001234",
+        "imps_ac_verified": null,
+        "micr_code": null,
+        "minor_bank_whitelist_flag": null,
+        "mobile_no": null,
+        "neftcode": null,
+        "om_expiry_date": "2027-04-15T09:42:19.554291+00:00",
+        "om_expiry_date_n": null,
+        "om_max_amount": 100000.0,
+        "om_max_amount_n": null,
+        "om_pref_open_mandate": null,
+        "om_reg_confirm_date": null,
+        "om_regn_mode": "ONLINE",
+        "om_start_date": "2026-04-15T09:42:19.554291+00:00",
+        "om_start_date_n": null,
+        "om_status": "A",
+        "om_status_old": null,
+        "otm_frequency": "MONTHLY",
+        "payout_purpose": null,
+        "regn_date": "2026-04-15T09:42:19.554291+00:00"
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [
+    {
+      "name": "otm_bank",
+      "description": "One-time mandate (OTM) via bank registration.",
+      "sql_pattern": "sphmf.multiple_bank mb ON mb.folio_no = dim.folio_number JOIN public.payout_mechanism pm ON mb.paymech = pm.pay_mech WHERE pm.otm_flag IS TRUE AND mb.om_umrn IS NOT NULL"
+    }
+  ],
+  "question_patterns": [],
+  "filter_vocabulary": {}
+}

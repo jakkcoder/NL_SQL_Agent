@@ -1,0 +1,49 @@
+# Local PostgreSQL + pgAdmin for offline dev (clone target). Not for production.
+#
+# Start:  ./scripts/local_postgres_up.sh   (Postgres + pgAdmin)
+# Postgres URL: postgresql://localdev:localdev@localhost:5433/investor_db_local
+# pgAdmin UI:   http://127.0.0.1:5050  (login below; server pre-registered)
+#
+# Data volumes (gitignored): backend/temp/docker-pgdata, backend/temp/pgadmin-data
+
+services:
+  investor-postgres-local:
+    image: postgres:16-alpine
+    container_name: nl-sql-agent-postgres-local
+    restart: unless-stopped
+    ports:
+      - "${LOCAL_PG_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: ${LOCAL_PG_USER:-localdev}
+      POSTGRES_PASSWORD: ${LOCAL_PG_PASSWORD:-localdev}
+      POSTGRES_DB: ${LOCAL_PG_DATABASE:-investor_db_local}
+    volumes:
+      - ../temp/docker-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${LOCAL_PG_USER:-localdev} -d ${LOCAL_PG_DATABASE:-investor_db_local}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: nl-sql-agent-pgadmin-local
+    restart: unless-stopped
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-local@nl-sql-agent.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-localdev}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - ../temp/pgadmin-data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      investor-postgres-local:
+        condition: service_healthy

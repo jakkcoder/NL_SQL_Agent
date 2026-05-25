@@ -1,0 +1,37 @@
+{
+  "module_id": "investor_filters",
+  "summary": "Age from public.investor.dob using AGE() or EXTRACT(YEAR FROM AGE(...)).",
+  "tables": [],
+  "join_recipes": [],
+  "question_patterns": [
+    {
+      "id": "age_range",
+      "user_examples": [
+        "Investor with Age between 30 and 40",
+        "investors aged 30-40"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "investor_identity"
+      ],
+      "sql_hints": [
+        "Return one row per investor: SELECT DISTINCT ON (i.uuid) i.uuid, … then ORDER BY i.uuid (required). Do not emit one row per folio unless the user asks for folio detail.",
+        "Filter on public.investor.dob; use EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int BETWEEN %s AND %s.",
+        "Age bounds are integers in parameters after session_arn (not inlined)."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email, i.dob, EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int AS age_years FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND i.dob IS NOT NULL AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int BETWEEN %s AND %s ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn",
+        "age_min",
+        "age_max"
+      ]
+    }
+  ],
+  "filter_vocabulary": {
+    "age_years": "EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int BETWEEN min AND max; require i.dob IS NOT NULL."
+  }
+}

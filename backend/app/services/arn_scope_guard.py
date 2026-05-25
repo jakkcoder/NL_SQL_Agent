@@ -16,6 +16,14 @@ def normalize_arn(value: str) -> str:
     return value.strip().upper()
 
 
+def is_arn_token(value: str) -> bool:
+    """True only for distributor ARN tokens (e.g. ARN-0411), not cities or free text."""
+
+    if not value or not value.strip():
+        return False
+    return bool(_ARN_TOKEN.fullmatch(value.strip()))
+
+
 def extract_arn_codes_from_text(text: str) -> list[str]:
     if not text:
         return []
@@ -34,9 +42,9 @@ def arn_scope_block_reason(
     if not trusted:
         return None
 
-    if tool_arn_arg:
+    if tool_arn_arg and is_arn_token(tool_arn_arg):
         arg = normalize_arn(tool_arn_arg)
-        if arg and arg != trusted:
+        if arg != trusted:
             return ARN_SCOPE_REPLY
 
     for code in extract_arn_codes_from_text(user_query):

@@ -1,0 +1,378 @@
+{
+  "module_id": "holdings_schemes",
+  "summary": "Holdings/unit balance from processed_trxns; scheme_master scheme_type; asset_class on scheme_setup; CGF; liquid-only logic.",
+  "tables": [
+    {
+      "fully_qualified": "public.scheme_master",
+      "purpose": "Scheme reference (scheme_cd, scheme_name, allow_broker). Join on sch_code = scheme_cd.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 205,
+      "columns_documented": 22,
+      "columns_omitted": 183,
+      "columns": [
+        {
+          "name": "active_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "allow_broker",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "fund_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "investment_option",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "scheme_cd",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "mutual fund scheme code (join to scheme_master.scheme_cd); character varying nullable"
+        },
+        {
+          "name": "scheme_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "scheme_type",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "approved_by",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "approved_dt",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "approved_note",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "cgf_applicable",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "clone_scheme_cd",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "created_by",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "created_dt",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "dividend_payout_applicable",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "dividend_reinvestment_applicable",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "document_required",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "document_type",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "dp_active",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "dtp_source_enabled",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "dtp_target_enabled",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "fatf_investor",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        }
+      ],
+      "sample_row": {
+        "active_flag": "Y",
+        "allow_broker": "Y",
+        "fund_code": "HCPROSEP13",
+        "investment_option": "Growth",
+        "scheme_cd": "CP2GR",
+        "scheme_name": "HDFC CPO 36M September 2013 - Series I - Growth",
+        "scheme_type": "DEBT",
+        "approved_by": "NEHALG",
+        "approved_dt": "2016-10-19T00:00:00",
+        "approved_note": null,
+        "cgf_applicable": false,
+        "clone_scheme_cd": null,
+        "created_by": "troy",
+        "created_dt": "2013-09-13T00:00:00",
+        "dividend_payout_applicable": false,
+        "dividend_reinvestment_applicable": false,
+        "document_required": "N",
+        "document_type": null,
+        "dp_active": "N",
+        "dtp_source_enabled": "N",
+        "dtp_target_enabled": "N",
+        "fatf_investor": "N"
+      },
+      "sample_row_note": null
+    },
+    {
+      "fully_qualified": "sphmf.scheme_setup",
+      "purpose": "Scheme setup flags (schcode, cgf_flag, plan_type) for CGF and plan filters.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 20,
+      "columns_documented": 20,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "cgf_flag",
+          "type": "character",
+          "nullable": "NO",
+          "description": "boolean/char flag; character"
+        },
+        {
+          "name": "plan_type",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "schcode",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "mutual fund scheme code (join to scheme_master.scheme_cd); character varying"
+        },
+        {
+          "name": "allot_dt",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "asset_class",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "close_dt",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "link_scheme_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "lockdate",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "timestamp with time zone nullable"
+        },
+        {
+          "name": "maturity_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "maturity_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "open_dt",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "scheme_cusip_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "scheme_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "scheme_type",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "schname",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "character varying"
+        },
+        {
+          "name": "short_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "sub_fund_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "subfundc",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "time_stamp",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "timestamp with time zone nullable"
+        }
+      ],
+      "sample_row": {
+        "cgf_flag": "N",
+        "plan_type": "R",
+        "schcode": "BFD",
+        "allot_dt": "2000-07-20T00:00:00+00:00",
+        "asset_class": "EQUITY",
+        "close_dt": "2999-12-31T00:00:00+00:00",
+        "commit_scn": null,
+        "link_scheme_code": null,
+        "lockdate": "2000-09-11T00:00:00+00:00",
+        "maturity_date": null,
+        "maturity_flag": "N",
+        "open_dt": "2000-09-11T00:00:00+00:00",
+        "scheme_cusip_no": "1005",
+        "scheme_flag": "O",
+        "scheme_type": "Balanced",
+        "schname": "HDFC Balanced Fund - Regular Plan - Dividend ",
+        "short_name": "HDFC Balanced Fund-Dividend",
+        "sub_fund_flag": "Y",
+        "subfundc": "PMC",
+        "time_stamp": null
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [
+    {
+      "name": "holdings_units",
+      "description": "Positive unit balance (holdings) by scheme.",
+      "sql_pattern": "sphmf.processed_trxns pt JOIN sphmf.customer_schemes cs ON pt.folio_no = cs.folio_no AND pt.sch_code = cs.sch_code JOIN public.scheme_master sm ON pt.sch_code = sm.scheme_cd WHERE pt.broker_code = %s GROUP BY pt.folio_no, pt.sch_code HAVING SUM(signed units) > 0"
+    },
+    {
+      "name": "cgf_schemes",
+      "description": "Capital gains feeder (CGF) scheme filter.",
+      "sql_pattern": "sphmf.scheme_setup WHERE cgf_flag = 'C' AND plan_type <> 'D'"
+    }
+  ],
+  "question_patterns": [
+    {
+      "id": "liquid_only_funds",
+      "user_examples": [
+        "Investors with investment only in Liquid / cash funds",
+        "only liquid fund holders"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.processed_trxns",
+        "public.scheme_master"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "holdings_units"
+      ],
+      "sql_hints": [
+        "Investors who HAVE positive units only in liquid schemes AND have NO positive units in non-liquid schemes.",
+        "Use two EXISTS / NOT EXISTS on aggregated processed_trxns by folio with scheme_master classification.",
+        "Liquid predicate from filter_vocabulary.scheme_classification.liquid_cash."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM sphmf.processed_trxns pt   JOIN public.scheme_master sm ON pt.sch_code = sm.scheme_cd   WHERE pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code   AND (lower(sm.scheme_type) LIKE '%%liquid%%' OR lower(sm.scheme_name) LIKE '%%liquid%%' OR EXISTS (SELECT 1 FROM sphmf.scheme_setup ss WHERE ss.schcode = pt.sch_code AND lower(ss.schname) LIKE '%%liquid%%'))   GROUP BY pt.folio_no, pt.sch_code HAVING SUM(CASE WHEN pt.trxn_sign = '+' THEN pt.units     WHEN pt.trxn_sign = '-' THEN -pt.units ELSE 0 END) > 0) AND NOT EXISTS (  SELECT 1 FROM sphmf.processed_trxns pt   JOIN public.scheme_master sm ON pt.sch_code = sm.scheme_cd   WHERE pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code   AND NOT (lower(sm.scheme_type) LIKE '%%liquid%%' OR lower(sm.scheme_name) LIKE '%%liquid%%' OR EXISTS (SELECT 1 FROM sphmf.scheme_setup ss WHERE ss.schcode = pt.sch_code AND lower(ss.schname) LIKE '%%liquid%%'))   GROUP BY pt.folio_no, pt.sch_code HAVING SUM(CASE WHEN pt.trxn_sign = '+' THEN pt.units     WHEN pt.trxn_sign = '-' THEN -pt.units ELSE 0 END) > 0) ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn"
+      ]
+    }
+  ],
+  "filter_vocabulary": {
+    "scheme_classification": {
+      "equity": "lower(sm.scheme_type) LIKE '%equity%' OR EXISTS on sphmf.scheme_setup (ss.schcode = pt.sch_code AND lower(ss.asset_class) = 'equity'); public.scheme_master has scheme_type/scheme_name only (no asset_class).",
+      "hybrid": "lower(sm.scheme_type) LIKE '%hybrid%' OR lower(sm.scheme_type) LIKE '%balanced%'",
+      "liquid_cash": "lower(sm.scheme_type) LIKE '%liquid%' OR lower(sm.scheme_name) LIKE '%liquid%' OR lower(ss.schname) LIKE '%liquid%' via scheme_setup ss on pt.sch_code = ss.schcode",
+      "cgf": "sch_code IN (SELECT schcode FROM sphmf.scheme_setup WHERE cgf_flag = 'C' AND plan_type <> 'D')"
+    }
+  }
+}

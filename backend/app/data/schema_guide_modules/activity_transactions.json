@@ -1,0 +1,767 @@
+{
+  "module_id": "activity_transactions",
+  "summary": "Purchases/redemptions via processed_trxns + transaction_types (trxndbcr P/R); FY and quarter windows on trxn_date.",
+  "tables": [
+    {
+      "fully_qualified": "sphmf.processed_trxns",
+      "purpose": "Posted transactions: units, trxn_sign, sch_code, broker_code, l_trxn_date, trxn_type.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 43,
+      "columns_documented": 43,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "broker_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "distributor ARN / broker code for row scope; character varying nullable"
+        },
+        {
+          "name": "folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "sch_code",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "mutual fund scheme code (join to scheme_master.scheme_cd); character varying"
+        },
+        {
+          "name": "trxn_sign",
+          "type": "character",
+          "nullable": "YES",
+          "description": "transaction sign (+ purchase / - redemption) for unit balance; character nullable"
+        },
+        {
+          "name": "trxn_subtype_code",
+          "type": "character",
+          "nullable": "NO",
+          "description": "code lookup key; character"
+        },
+        {
+          "name": "trxn_type_code",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "code lookup key; character varying"
+        },
+        {
+          "name": "units",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "transaction units; numeric"
+        },
+        {
+          "name": "amc_comm",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "appl_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "arn_emp_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "atrxn_no",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "branch_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "brok_comm",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "brok_dlr_comm_paid",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "brok_perc",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "collection_bank_code",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "code lookup key; character varying"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "eisc_trxn_no",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "entry_date",
+          "type": "timestamp with time zone",
+          "nullable": "NO",
+          "description": "date/timestamp; timestamp with time zone"
+        },
+        {
+          "name": "euin_opted",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "euin_valid",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "old_scheme_code",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "code lookup key; character varying"
+        },
+        {
+          "name": "plot_amount",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "prev_folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "price",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "process_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "purch_id",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "remarks",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "source",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "source_broker_type",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "stt_tax",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "sub_broker_arn",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "subbroker_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "tax",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "ter_location",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "time_stamp",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "timestamp with time zone nullable"
+        },
+        {
+          "name": "total_tax",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "trxn_date",
+          "type": "timestamp with time zone",
+          "nullable": "NO",
+          "description": "date/timestamp; timestamp with time zone"
+        },
+        {
+          "name": "trxn_no",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "trxn_status",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "trxn_type_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "update_serial",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        }
+      ],
+      "sample_row": {
+        "broker_code": "ARN-0411",
+        "folio_no": "8829887",
+        "sch_code": "MULG",
+        "trxn_sign": "+",
+        "trxn_subtype_code": "N",
+        "trxn_type_code": "P43A",
+        "units": 3702.543,
+        "amc_comm": 0.0,
+        "amount": 130000.0,
+        "appl_no": null,
+        "arn_emp_code": "E030803",
+        "atrxn_no": null,
+        "branch_code": "BKN151",
+        "brok_comm": 0.0,
+        "brok_dlr_comm_paid": "Y",
+        "brok_perc": 0.0,
+        "collection_bank_code": "CAMSSUDH",
+        "commit_scn": null,
+        "eisc_trxn_no": 8969712,
+        "entry_date": "2023-12-28T12:25:46+00:00",
+        "euin_opted": "Y",
+        "euin_valid": "Y",
+        "old_scheme_code": "MULG",
+        "plot_amount": 130000.0,
+        "prev_folio_no": "8829887",
+        "price": 35.111,
+        "process_date": "2022-10-05T12:25:46",
+        "purch_id": 14677999507,
+        "remarks": "<E/S:B>Transaction Received Between 2 P.M and 3 P.M$11/May/2018 16:35:28<MULTI INV TC CHECK UPDATED_ENTRY_DATE-11-May-2018 AND LOCATED ON 11-MAY-2018 16:47:4...",
+        "source": "eISC",
+        "source_broker_type": null,
+        "stt_tax": 0.0,
+        "sub_broker_arn": null,
+        "subbroker_code": null,
+        "tax": 0.0,
+        "ter_location": "B",
+        "time_stamp": null,
+        "total_tax": 0.0,
+        "trxn_date": "2022-10-05T12:25:46+00:00",
+        "trxn_no": 142062039,
+        "trxn_status": "N",
+        "trxn_type_flag": "AP",
+        "update_serial": null
+      },
+      "sample_row_note": null
+    },
+    {
+      "fully_qualified": "sphmf.transaction_types",
+      "purpose": "Maps trxn_type_code to trxndbcr / subtype for activity filters (purchase, redemption, SIP, etc.).",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 6,
+      "columns_documented": 6,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "trxndbcr",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "character varying"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "face_value_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "time_stamp",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "trxntypcod",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "character varying"
+        },
+        {
+          "name": "trxntypdes",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "character varying"
+        }
+      ],
+      "sample_row": {
+        "trxndbcr": "P",
+        "commit_scn": null,
+        "face_value_flag": "N",
+        "time_stamp": null,
+        "trxntypcod": "PIXH",
+        "trxntypdes": "NFO Purchase"
+      },
+      "sample_row_note": null
+    },
+    {
+      "fully_qualified": "sphmf.trigger_trxn",
+      "purpose": "Trigger-based transaction rows.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 36,
+      "columns_documented": 36,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "div_reinv_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "schcode",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "mutual fund scheme code (join to scheme_master.scheme_cd); character varying"
+        },
+        {
+          "name": "trxn_type_code",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "code lookup key; character varying"
+        },
+        {
+          "name": "units",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "transaction units; numeric nullable"
+        },
+        {
+          "name": "arn_emp_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "brokcode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "cease_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "chk_digit",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "commence_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "date_of_exec",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "entry_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "euin_opted",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "euin_valid",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "event_no",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "gain_or_value",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "high_or_low",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "last_alert_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "location_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "nav_high",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "nav_low",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "nav_perc",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "percent_of",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "price",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "reference_no",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "remarks",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "sensex_value",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "subbroker_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "tc_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "time_stamp",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "toschcode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "total_units",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "trig_logic",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "usercode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "usertrxnno",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        }
+      ],
+      "sample_row": {
+        "div_reinv_flag": "Z",
+        "folio_no": "7629387",
+        "schcode": "54",
+        "trxn_type_code": "SO",
+        "units": 0.0,
+        "arn_emp_code": null,
+        "brokcode": "ARN-7761",
+        "cease_date": null,
+        "chk_digit": "51",
+        "commence_date": "2023-08-12T00:00:00",
+        "commit_scn": null,
+        "date_of_exec": null,
+        "entry_date": "2022-09-24T00:00:00",
+        "euin_opted": null,
+        "euin_valid": null,
+        "event_no": 46331,
+        "gain_or_value": null,
+        "high_or_low": null,
+        "last_alert_date": null,
+        "location_code": "755",
+        "nav_high": null,
+        "nav_low": null,
+        "nav_perc": null,
+        "percent_of": 30.0,
+        "price": 50000.0,
+        "reference_no": 4076,
+        "remarks": " EBT Ceased - Not triggered for 365 days",
+        "sensex_value": 7000.0,
+        "subbroker_code": null,
+        "tc_date": null,
+        "time_stamp": null,
+        "toschcode": "44",
+        "total_units": null,
+        "trig_logic": "E",
+        "usercode": "CBE_ARUN",
+        "usertrxnno": 134458
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [
+    {
+      "name": "investor_activity",
+      "description": "Purchases/redemptions/SIP/STP over a time window.",
+      "sql_pattern": "sphmf.processed_trxns pt JOIN sphmf.transaction_types tt ON pt.trxn_type = tt.trxn_type_code WHERE pt.broker_code = %s AND pt.l_trxn_date >= %s"
+    },
+    {
+      "name": "redemption_activity",
+      "description": "Redemption posted transactions in a date window (join transaction_types).",
+      "sql_pattern": "sphmf.processed_trxns pt ON pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod WHERE pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R' AND pt.trxn_date >= %s AND pt.trxn_date < %s"
+    },
+    {
+      "name": "purchase_activity",
+      "description": "Purchase posted transactions (for top-N / FY totals).",
+      "sql_pattern": "sphmf.processed_trxns pt ON pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod WHERE pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'P' AND pt.trxn_date >= %s AND pt.trxn_date < %s"
+    }
+  ],
+  "question_patterns": [
+    {
+      "id": "redemption_equity_last_quarter",
+      "user_examples": [
+        "Investors who did redemption in last quarter for equity funds",
+        "redemption last quarter equity"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.processed_trxns",
+        "sphmf.transaction_types",
+        "public.scheme_master"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "redemption_activity"
+      ],
+      "sql_hints": [
+        "Use EXISTS on processed_trxns + transaction_types for redemption (trxndbcr='R', trxn_subtype_code='N').",
+        "Date window: last completed calendar quarter (see filter_vocabulary.last_calendar_quarter).",
+        "Equity: JOIN scheme_master sm ON pt.sch_code = sm.scheme_cd; use filter_vocabulary.scheme_classification.equity (scheme_type + optional scheme_setup.asset_class; do not use sm.asset_class).",
+        "Scope pt.broker_code = session_arn."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM sphmf.processed_trxns pt   JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod   JOIN public.scheme_master sm ON pt.sch_code = sm.scheme_cd   WHERE pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code   AND pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R'   AND pt.trxn_date >= %s AND pt.trxn_date < %s   AND (lower(sm.scheme_type) LIKE '%%equity%%' OR EXISTS (SELECT 1 FROM sphmf.scheme_setup ss WHERE ss.schcode = pt.sch_code AND lower(ss.asset_class) = 'equity'))) ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn",
+        "quarter_start",
+        "quarter_end"
+      ]
+    },
+    {
+      "id": "investor_last_redemption_date",
+      "user_examples": [
+        "When was the last redemption for Aparna Jha",
+        "last redemption date for investor named Bhavin",
+        "show when investor last redeemed"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.processed_trxns",
+        "sphmf.transaction_types"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "redemption_activity"
+      ],
+      "sql_hints": [
+        "Name filters: match only on normalized full name — lower(replace(trim(concat_ws(' ', coalesce(i.first_name, ''), coalesce(i.last_name, ''))), ' ', '')) ILIKE %s. Never filter with separate first_name = … AND last_name = … or first_name-only ILIKE. Bind one parameter: lowercase, remove all spaces from the user's name, wrap as %%token%% (e.g. 'Aparna Jha' → '%%aparnajha%%'; 'Bhavin' → '%%bhavin%%').",
+        "Return the investor row with last_redemption_date = MAX(pt.trxn_date) across all ARN folios.",
+        "Use LEFT JOIN on aggregated redemptions so the investor still appears when no redemption exists (NULL date).",
+        "Redemption: pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R'; date column pt.trxn_date only.",
+        "Do not use EXISTS-only filters without returning last_redemption_date for 'when was last' questions."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email, lr.last_redemption_date FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid LEFT JOIN (  SELECT dim2.investor_uuid, MAX(pt.trxn_date) AS last_redemption_date   FROM public.distributor_investor_mapping dim2   JOIN sphmf.processed_trxns pt ON pt.folio_no = dim2.folio_number     AND pt.broker_code = dim2.arn_code   JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod   WHERE dim2.arn_code = %s AND pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R'   GROUP BY dim2.investor_uuid) lr ON lr.investor_uuid = i.uuid WHERE dim.arn_code = %s AND lower(replace(trim(concat_ws(' ', coalesce(i.first_name, ''), coalesce(i.last_name, ''))), ' ', '')) ILIKE %s ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn (redemption aggregate subquery)",
+        "session_arn (outer dim)",
+        "name_pattern e.g. %aparnajha%"
+      ]
+    },
+    {
+      "id": "top_purchases_fy25",
+      "user_examples": [
+        "Top 20 investors by purchases in FY25",
+        "top investors by purchase amount FY25"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.processed_trxns",
+        "sphmf.transaction_types"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "purchase_activity"
+      ],
+      "sql_hints": [
+        "Aggregate SUM(pt.amount) or COUNT(*) for purchases (trxndbcr='P', trxn_subtype_code='N').",
+        "FY25 window: 2025-04-01 to 2026-04-01 on pt.trxn_date (see filter_vocabulary.financial_year_fy25).",
+        "ORDER BY total DESC LIMIT 20 (user top N)."
+      ],
+      "sql_skeleton": "SELECT i.first_name, i.last_name, i.email, SUM(pt.amount) AS purchase_total FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.processed_trxns pt ON pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod WHERE dim.arn_code = %s AND pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'P' AND pt.trxn_date >= %s AND pt.trxn_date < %s GROUP BY i.uuid, i.first_name, i.last_name, i.email ORDER BY purchase_total DESC LIMIT 20",
+      "parameters_order": [
+        "session_arn",
+        "fy_start",
+        "fy_end"
+      ]
+    }
+  ],
+  "filter_vocabulary": {
+    "activity": {
+      "purchase": "pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'P'",
+      "redemption": "pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R'",
+      "sip_posted": "pt.trxn_subtype_code = 'S' AND tt.trxndbcr = 'P'"
+    },
+    "processed_trxns_date": "Date windows on sphmf.processed_trxns use pt.trxn_date (not l_trxn_date; customer_schemes still uses cs.l_trxn_date).",
+    "financial_year_fy25": {
+      "india_fy": "FY25 = 2025-04-01 inclusive to 2026-04-01 exclusive on pt.trxn_date",
+      "note": "Adjust bounds if user names a different FY explicitly."
+    },
+    "last_calendar_quarter": "date_trunc('quarter', CURRENT_DATE) - interval '3 months' as start, date_trunc('quarter', CURRENT_DATE) as end"
+  }
+}

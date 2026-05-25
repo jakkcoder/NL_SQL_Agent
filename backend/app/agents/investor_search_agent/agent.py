@@ -13,7 +13,11 @@ if str(_BACKEND_ROOT) not in sys.path:
 from google.adk.agents.llm_agent import Agent
 from google.genai import types as genai_types
 
-from app.agents.tools import generate_catalog_sql_query_tool, greeting_tool
+from app.agents.tools import (
+    detect_intent_tool,
+    generate_catalog_sql_query_tool,
+    greeting_tool,
+)
 from app.core.config import apply_runtime_env, get_config
 from app.services.filter_prompts import build_root_agent_instruction
 
@@ -25,6 +29,7 @@ apply_runtime_env(config)
 def _root_tools():
     return [
         greeting_tool,
+        detect_intent_tool,
         generate_catalog_sql_query_tool,
     ]
 
@@ -47,7 +52,11 @@ def _root_agent_generate_config() -> genai_types.GenerateContentConfig:
 root_agent = Agent(
     model=config.llm.model,  # small/fast Bedrock model (BEDROCK_MODEL_ID / BEDROCK_ROOT_MODEL_ID)
     name="investor_search_agent",
-    description="Distributor investor assistant: greeting or catalog-backed SQL generation.",
+    description=(
+        "Distributor investor assistant. For investor data questions call "
+        "generate_catalog_sql_query_tool (or detect_intent_tool, which runs the same SQL path). "
+        "Use greeting_tool only for hi/thanks."
+    ),
     instruction=build_root_agent_instruction(),
     tools=_root_tools(),
     generate_content_config=_root_agent_generate_config(),

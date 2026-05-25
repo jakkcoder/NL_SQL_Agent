@@ -1,0 +1,6 @@
+# Keep folder in git; ignore all local clone artifacts
+*
+!.gitignore
+!README.md
+!clone.env.example
+# docker-pgdata and pgadmin-data are ignored via * above

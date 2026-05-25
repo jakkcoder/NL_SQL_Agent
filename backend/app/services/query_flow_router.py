@@ -10,9 +10,10 @@ from typing import Any
 import litellm
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.agents.system_prompts import CATALOG_SQL_GENERATOR_SYSTEM_PROMPT
+from app.agents.system_prompts import build_catalog_sql_generator_system_prompt
 from app.core.config import apply_runtime_env, get_config
 from app.services.llm_json import parse_json_content
+from app.services.sql_guard import normalize_catalog_sql_parameters, sanitize_catalog_sql
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,11 @@ class CatalogSqlGeneratorTurn(BaseModel):
     parameters: list[Any] = Field(default_factory=list)
 
 
-def _normalize_generator_payload(raw: dict[str, Any]) -> dict[str, Any]:
+def _normalize_generator_payload(raw: Any) -> dict[str, Any]:
     """Coerce occasional model quirks (e.g. parameters as a JSON/Python string)."""
 
+    if not isinstance(raw, dict):
+        raise ValueError(f"Catalog SQL generator JSON must be an object, got {type(raw).__name__}")
     out = dict(raw)
     params = out.get("parameters")
     if isinstance(params, str):
@@ -58,6 +61,7 @@ def run_catalog_sql_generator_llm(
     catalog_dict: dict[str, Any] | None = None,
     catalog_max_chars: int = 0,
     guide_only: bool | None = None,
+    repair_context: dict[str, Any] | None = None,
 ) -> tuple[CatalogSqlGeneratorTurn, dict[str, Any]]:
     """Single-shot SQL proposal from schema guide (and optionally filter catalog)."""
 
@@ -73,7 +77,33 @@ def run_catalog_sql_generator_llm(
     if use_guide_only and not is_guide:
         use_guide_only = False
 
-    schema_raw = serialize_schema_contract_for_prompt(schema_contract, schema_contract_max_chars)
+    selected_modules: list[str] = []
+    module_selection: dict[str, Any] = {}
+    if (
+        use_guide_only
+        and is_guide
+        and cfg.query_generator_modular_guide_enabled
+    ):
+        from app.services.schema_guide_modules import (
+            build_guide_payload_for_question,
+            modular_guide_available,
+        )
+
+        if modular_guide_available():
+            schema_raw, selected_modules, module_selection = build_guide_payload_for_question(
+                question,
+                repair_context=repair_context,
+                max_chars=cfg.query_generator_modular_guide_max_chars,
+                max_modules=cfg.query_generator_guide_max_modules,
+            )
+        else:
+            schema_raw = serialize_schema_contract_for_prompt(
+                schema_contract, schema_contract_max_chars
+            )
+    else:
+        schema_raw = serialize_schema_contract_for_prompt(
+            schema_contract, schema_contract_max_chars
+        )
 
     if use_guide_only:
         user_payload = {
@@ -81,6 +111,10 @@ def run_catalog_sql_generator_llm(
             "investor_schema_guide_json": schema_raw,
             "question": question,
         }
+        if selected_modules:
+            user_payload["selected_guide_modules"] = selected_modules
+        if repair_context:
+            user_payload["repair_context"] = repair_context
         cat_raw = ""
     else:
         catalog_dict = catalog_dict or {}
@@ -99,7 +133,7 @@ def run_catalog_sql_generator_llm(
     user_str = json.dumps(user_payload, ensure_ascii=True)
 
     log: dict[str, Any] = {
-        "phase": "catalog_sql_generator",
+        "phase": "catalog_sql_generator_repair" if repair_context else "catalog_sql_generator",
         "model": model,
         "payload_mode": "guide_only" if use_guide_only else "guide_and_catalog",
         "user_payload_keys": sorted(user_payload.keys()),
@@ -107,12 +141,15 @@ def run_catalog_sql_generator_llm(
         "catalog_json_chars": len(cat_raw),
         "schema_guide_json_chars": len(schema_raw),
         "schema_contract_kind": schema_contract.get("contract_kind"),
+        "selected_guide_modules": selected_modules,
+        "module_selection_method": module_selection.get("selection_method"),
+        "module_router_thought": module_selection.get("router_thought"),
         "question": question,
         "raw_response": None,
         "error": None,
     }
 
-    system = CATALOG_SQL_GENERATOR_SYSTEM_PROMPT
+    system = build_catalog_sql_generator_system_prompt()
 
     kwargs: dict[str, Any] = {
         "model": model,
@@ -121,7 +158,7 @@ def run_catalog_sql_generator_llm(
             {"role": "user", "content": user_str},
         ],
         "temperature": 0,
-        "timeout": cfg.llm.request_timeout_seconds,
+        "timeout": cfg.query_generator_request_timeout_seconds,
         "response_format": {"type": "json_object"},
     }
     max_out = cfg.query_generator_max_output_tokens_resolved
@@ -135,6 +172,15 @@ def run_catalog_sql_generator_llm(
         raise ValueError("Empty catalog SQL generator response")
     turn = CatalogSqlGeneratorTurn.model_validate(
         _normalize_generator_payload(parse_json_content(content))
+    )
+    sql = sanitize_catalog_sql(turn.sql)
+    turn = turn.model_copy(
+        update={
+            "sql": sql,
+            "parameters": normalize_catalog_sql_parameters(
+                sql, list(turn.parameters), trusted_arn
+            ),
+        }
     )
     log["parsed_thought"] = turn.thought
     log["parsed_sql"] = turn.sql

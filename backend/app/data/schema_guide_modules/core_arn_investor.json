@@ -1,0 +1,193 @@
+{
+  "module_id": "core_arn_investor",
+  "summary": "Mandatory ARN scope via distributor_investor_mapping; investor identity (name, PAN, email, mobile, dob).",
+  "tables": [
+    {
+      "fully_qualified": "public.distributor_investor_mapping",
+      "purpose": "Bridge table: links distributor ARN (arn_code) to investor UUID and folio_number. Use as the mandatory ARN scope anchor for every query.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 9,
+      "columns_documented": 9,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "arn_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "distributor ARN / broker code for row scope; character varying nullable"
+        },
+        {
+          "name": "folio_number",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "folio identifier linking sphmf and public schemas; character varying nullable"
+        },
+        {
+          "name": "investor_uuid",
+          "type": "uuid",
+          "nullable": "YES",
+          "description": "investor UUID key; uuid nullable"
+        },
+        {
+          "name": "pan_number",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "PAN tax id; character varying"
+        },
+        {
+          "name": "uuid",
+          "type": "uuid",
+          "nullable": "NO",
+          "description": "investor UUID key; uuid"
+        },
+        {
+          "name": "created_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "marketing_subscription",
+          "type": "boolean",
+          "nullable": "NO",
+          "description": "boolean"
+        },
+        {
+          "name": "whatsapp_notifications",
+          "type": "boolean",
+          "nullable": "NO",
+          "description": "boolean"
+        },
+        {
+          "name": "whatsapp_subscription",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        }
+      ],
+      "sample_row": {
+        "arn_code": "ARN-104355",
+        "folio_number": "16900093",
+        "investor_uuid": "5f4992ac-278e-4fc1-860a-3be27150548a",
+        "pan_number": "DCYPK0590N",
+        "uuid": "dbb7613b-d57a-4358-84f6-90a3f2b3281b",
+        "created_date": null,
+        "marketing_subscription": true,
+        "whatsapp_notifications": true,
+        "whatsapp_subscription": false
+      },
+      "sample_row_note": null
+    },
+    {
+      "fully_qualified": "public.investor",
+      "purpose": "Investor master: legal name, PAN, date of birth, email, mobile. Join via uuid = distributor_investor_mapping.investor_uuid.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 11,
+      "columns_documented": 11,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "dob",
+          "type": "date",
+          "nullable": "YES",
+          "description": "date of birth; use AGE(dob) for age filters; date nullable"
+        },
+        {
+          "name": "email",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "email address; character varying nullable"
+        },
+        {
+          "name": "first_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "last_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "middle_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "mobile_number",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "pan_number",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "PAN tax id; character varying nullable"
+        },
+        {
+          "name": "uuid",
+          "type": "uuid",
+          "nullable": "NO",
+          "description": "investor UUID key; uuid"
+        },
+        {
+          "name": "created_time",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "is_mobile_active",
+          "type": "boolean",
+          "nullable": "NO",
+          "description": "boolean"
+        },
+        {
+          "name": "is_pan_aadhar_linked",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "PAN tax id; character varying nullable"
+        }
+      ],
+      "sample_row": {
+        "dob": "1981-06-29",
+        "email": "SAURABH.JAIN.29@GMAIL.COM",
+        "first_name": "SAURABH DEVENDRA JAIN",
+        "last_name": null,
+        "middle_name": null,
+        "mobile_number": "9869279902",
+        "pan_number": "AEBPJ7885D",
+        "uuid": "dc53aaee-139f-4fba-b3a7-3752b9923b92",
+        "created_time": "2021-03-17T05:52:30.627",
+        "is_mobile_active": true,
+        "is_pan_aadhar_linked": null
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [
+    {
+      "name": "arn_scope_anchor",
+      "description": "Every query must scope to the session distributor ARN.",
+      "sql_pattern": "public.distributor_investor_mapping dim WHERE dim.arn_code = %s"
+    },
+    {
+      "name": "investor_identity",
+      "description": "List investors for an ARN.",
+      "sql_pattern": "dim.investor_uuid = public.investor.uuid AND dim.arn_code = %s"
+    }
+  ],
+  "question_patterns": [],
+  "filter_vocabulary": {
+    "arn_scope": "First parameter is always session_arn; every query uses distributor_investor_mapping.arn_code = %s.",
+    "name_search": "lower(replace(trim(concat_ws(' ', coalesce(i.first_name, ''), coalesce(i.last_name, ''))), ' ', '')) ILIKE %s — one %%pattern%% parameter: lowercase, all spaces stripped from the user's name (concat first+last in SQL, not separate column filters)."
+  }
+}

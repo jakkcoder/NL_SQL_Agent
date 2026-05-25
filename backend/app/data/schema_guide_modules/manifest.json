@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "source_guide": "investor_db_schema_guide.json",
+  "sql_rules": {
+    "read_only": "Single SELECT or WITH…SELECT; LIMIT <= 500.",
+    "parameters": "Use %s placeholders only; first parameter is session_arn.",
+    "arn_scope": "Always filter via public.distributor_investor_mapping.arn_code = %s.",
+    "identifiers": "Use only tables/columns listed under tables[].columns in this guide.",
+    "joins": "Prefer join_recipes; match folio_no/folio_number and sch_code/scheme_cd consistently.",
+    "advanced": "Use EXISTS subqueries for holdings/activity/SIP filters; AGE(dob) for age; ILIKE for city; aggregate HAVING for unit balances.",
+    "question_patterns": "Before writing SQL, match the user question to question_patterns[].user_examples; follow that pattern's sql_hints and sql_skeleton (parameterize with %s).",
+    "performance": "Prefer EXISTS subqueries scoped to arn_scope; avoid joining sipstp/processed_trxns to investor without folio+broker predicates; always LIMIT <= 500.",
+    "investor_row_dedup": "Return one row per investor: SELECT DISTINCT ON (i.uuid) i.uuid, … then ORDER BY i.uuid (required). Do not emit one row per folio unless the user asks for folio detail.",
+    "investor_name_search": "Name filters: match only on normalized full name — lower(replace(trim(concat_ws(' ', coalesce(i.first_name, ''), coalesce(i.last_name, ''))), ' ', '')) ILIKE %s. Never filter with separate first_name = … AND last_name = … or first_name-only ILIKE. Bind one parameter: lowercase, remove all spaces from the user's name, wrap as %%token%% (e.g. 'Aparna Jha' → '%%aparnajha%%'; 'Bhavin' → '%%bhavin%%')."
+  },
+  "modules": [
+    {
+      "id": "core_arn_investor",
+      "always_include": true,
+      "summary": "Mandatory ARN scope via distributor_investor_mapping; investor identity (name, PAN, email, mobile, dob).",
+      "keywords": [
+        "investor",
+        "investors",
+        "my",
+        "list",
+        "show",
+        "all"
+      ],
+      "sql_table_markers": [
+        "distributor_investor_mapping",
+        "public.investor"
+      ]
+    },
+    {
+      "id": "geography_city",
+      "summary": "City and folio KYC via sphmf.customer_master; ILIKE on city; name + multi-city OR.",
+      "keywords": [
+        "mumbai",
+        "ahmedabad",
+        "city",
+        "cities",
+        "location",
+        "geography",
+        "named",
+        "bhavin",
+        "name"
+      ],
+      "sql_table_markers": [
+        "customer_master"
+      ]
+    },
+    {
+      "id": "investor_filters",
+      "summary": "Age from public.investor.dob using AGE() or EXTRACT(YEAR FROM AGE(...)).",
+      "keywords": [
+        "age",
+        "aged",
+        "years",
+        "year",
+        "between",
+        "dob",
+        "30",
+        "40"
+      ],
+      "sql_table_markers": [
+        ".dob",
+        "age("
+      ]
+    },
+    {
+      "id": "activity_transactions",
+      "summary": "Purchases/redemptions via processed_trxns + transaction_types (trxndbcr P/R); FY and quarter windows on trxn_date.",
+      "keywords": [
+        "redemption",
+        "redeemed",
+        "purchase",
+        "purchases",
+        "quarter",
+        "fy25",
+        "fy",
+        "financial year",
+        "equity",
+        "transaction",
+        "top"
+      ],
+      "phrase_patterns": [
+        "last quarter",
+        "fy\\s*25"
+      ],
+      "sql_table_markers": [
+        "processed_trxns",
+        "transaction_types"
+      ]
+    },
+    {
+      "id": "sip_systematic",
+      "summary": "Active SIP/STP on sphmf.sipstp (cease_dt, to_date, atrxn_type, amount); scheme_master for hybrid filter.",
+      "keywords": [
+        "sip",
+        "sips",
+        "systematic",
+        "stp",
+        "swp",
+        "5000",
+        "5,000",
+        "monthly",
+        "hybrid",
+        "instalment",
+        "installment",
+        "active sip",
+        "no active sip",
+        "without sip"
+      ],
+      "sql_table_markers": [
+        "sipstp"
+      ]
+    },
+    {
+      "id": "holdings_schemes",
+      "summary": "Holdings/unit balance from processed_trxns; scheme_master scheme_type; asset_class on scheme_setup; CGF; liquid-only logic.",
+      "keywords": [
+        "liquid",
+        "cash",
+        "units",
+        "holding",
+        "holdings",
+        "scheme",
+        "schemes",
+        "hybrid",
+        "balanced",
+        "equity fund",
+        "only in"
+      ],
+      "sql_table_markers": [
+        "scheme_master",
+        "scheme_setup"
+      ]
+    },
+    {
+      "id": "dormant_holdings",
+      "summary": "Dormant/inactive via customer_schemes.l_trxn_date; zero units via processed_trxns aggregates.",
+      "keywords": [
+        "dormant",
+        "inactive",
+        "not transacted",
+        "no transaction",
+        "zero units",
+        "0 units"
+      ],
+      "sql_table_markers": [
+        "customer_schemes"
+      ]
+    },
+    {
+      "id": "tax_profile",
+      "summary": "NRI (tax_status.nri_nre), minor (minor_flag), CGF scheme membership.",
+      "keywords": [
+        "nri",
+        "nre",
+        "minor",
+        "cgf",
+        "capital gains feeder"
+      ],
+      "sql_table_markers": [
+        "tax_status",
+        "cgf_flag"
+      ]
+    },
+    {
+      "id": "banking_otm",
+      "summary": "OTM / bank mandate via multiple_bank and payout_mechanism (optional).",
+      "keywords": [
+        "otm",
+        "mandate",
+        "bank"
+      ],
+      "sql_table_markers": [
+        "multiple_bank",
+        "payout_mechanism"
+      ]
+    }
+  ]
+}

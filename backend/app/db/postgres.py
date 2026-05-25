@@ -5,6 +5,8 @@ from psycopg import OperationalError
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool, PoolTimeout
 
+from app.services.sql_guard import escape_literal_percent_for_pyformat
+
 
 class DatabaseNotConfiguredError(RuntimeError):
     pass
@@ -73,7 +75,12 @@ class PostgresClient:
                 with conn.cursor() as cur:
                     cur.execute("BEGIN READ ONLY")
                     cur.execute(f"SET LOCAL statement_timeout = {timeout_ms}")
-                    cur.execute(query, params or ())
+                    exec_sql = (
+                        escape_literal_percent_for_pyformat(query)
+                        if params
+                        else query
+                    )
+                    cur.execute(exec_sql, params or ())
                     rows = [dict(row) for row in cur.fetchall()]
                 conn.commit()
                 return rows

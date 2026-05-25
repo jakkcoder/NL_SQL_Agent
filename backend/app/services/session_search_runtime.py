@@ -2,8 +2,9 @@
 
 On the first search-related turn in a session the backend:
 
-1. Loads the investor schema contract: **live PostgreSQL introspection** when
-   ``DEV_DATABASE_URL`` is set and ``DEV_LOCAL_SQLITE_MIRROR`` is **not** set (development);
+1. Loads the investor schema contract: **live PostgreSQL introspection** when a warehouse URL
+   is configured (``LOCAL_DATABASE_URL`` when ``USE_LOCAL_DOCKER_POSTGRES=true``, else
+   ``DEV_DATABASE_URL``) and ``DEV_LOCAL_SQLITE_MIRROR`` is **not** set (development);
    otherwise the packaged ``investor_db_schema_contract.json``. Stores a compact copy in
    session state (and may rewrite the JSON file on live success).
 2. Builds a **snapshot** of the filter catalog (merged from PostgreSQL, a local SQLite
@@ -13,7 +14,7 @@ On the first search-related turn in a session the backend:
 When ``DEV_LOCAL_SQLITE_MIRROR`` is set to an existing file in a **development** ``APP_ENV``,
 live PostgreSQL **schema introspection is skipped** (packaged ``investor_db_schema_contract.json``
 only); catalog merge still uses that SQLite file. Warehouse SQL execution continues to use
-``DEV_DATABASE_URL`` / ``PROD_DATABASE_URL`` when configured.
+``database_url_value`` (local Docker or ``DEV_DATABASE_URL`` / ``PROD_DATABASE_URL``) when configured.
 
 Later turns in the same session reuse both snapshots without re-running DB export or
 catalog refresh unless session state keys for schema/catalog are cleared.

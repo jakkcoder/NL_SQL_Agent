@@ -65,7 +65,7 @@ Unset `FILTER_CATALOG_SQLITE_PATH` if you want catalog merge to use this same DB
 ## Alternatives
 
 - **Plain SQL dump** (`pg_dump --format=plain --file=dev.sql`) then `psql -f dev.sql`—simple but slower and heavier for large DBs.
-- **Docker Postgres** as restore target: mount a volume, `pg_restore` into the container DB, expose port 5432.
+- **Docker Postgres** (recommended in this repo): `backend/scripts/local_postgres_up.sh` + `clone_dev_db_docker.sh` — see [local_docker_postgres.md](./local_docker_postgres.md). Local port defaults to **5433**; dumps and data under `backend/temp/`.
 - **Team-managed snapshot**: many orgs provide weekly sanitized dumps; use those instead of live `pg_dump` from shared dev if policy requires it.
 
 ## Security

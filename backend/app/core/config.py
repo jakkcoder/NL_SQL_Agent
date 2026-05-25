@@ -84,6 +84,13 @@ class AppConfig(BaseSettings):
     service_name: str = Field(default="nl-sql-agent", alias="SERVICE_NAME")
 
     dev_database_url: SecretStr | None = Field(default=None, alias="DEV_DATABASE_URL")
+    # When true in local/dev APP_ENV, SQL execution and catalog merge use LOCAL_DATABASE_URL
+    # (Docker Postgres on port 5433) instead of DEV_DATABASE_URL (remote VPN host).
+    use_local_docker_postgres: bool = Field(default=True, alias="USE_LOCAL_DOCKER_POSTGRES")
+    local_database_url: str | None = Field(
+        default="postgresql://localdev:localdev@localhost:5433/investor_db_local",
+        alias="LOCAL_DATABASE_URL",
+    )
     dev_db_statement_timeout_ms: int = Field(default=15000, alias="DEV_DB_STATEMENT_TIMEOUT_MS")
     dev_db_pool_min_size: int = Field(default=1, alias="DEV_DB_POOL_MIN_SIZE")
     dev_db_pool_max_size: int = Field(default=4, alias="DEV_DB_POOL_MAX_SIZE")
@@ -114,6 +121,75 @@ class AppConfig(BaseSettings):
     query_generator_guide_only: bool = Field(
         default=True,
         alias="QUERY_GENERATOR_GUIDE_ONLY",
+    )
+    query_generator_modular_guide_enabled: bool = Field(
+        default=True,
+        alias="QUERY_GENERATOR_MODULAR_GUIDE",
+    )
+    query_generator_guide_max_modules: int = Field(
+        default=5,
+        alias="QUERY_GENERATOR_GUIDE_MAX_MODULES",
+    )
+    query_generator_modular_guide_max_chars: int = Field(
+        default=48_000,
+        alias="QUERY_GENERATOR_MODULAR_GUIDE_MAX_CHARS",
+    )
+    query_generator_module_router_llm_enabled: bool = Field(
+        default=True,
+        alias="QUERY_GENERATOR_MODULE_ROUTER_LLM",
+    )
+    query_generator_module_router_keyword_fallback: bool = Field(
+        default=True,
+        alias="QUERY_GENERATOR_MODULE_ROUTER_KEYWORD_FALLBACK",
+    )
+    module_router_request_timeout_seconds: int = Field(
+        default=30,
+        alias="MODULE_ROUTER_REQUEST_TIMEOUT_SECONDS",
+    )
+    module_router_max_output_tokens: int = Field(
+        default=512,
+        alias="MODULE_ROUTER_MAX_OUTPUT_TOKENS",
+    )
+    bedrock_module_router_model_id: str | None = Field(
+        default=None,
+        alias="BEDROCK_MODULE_ROUTER_MODEL_ID",
+    )
+    catalog_sql_execute_enabled: bool = Field(
+        default=True,
+        alias="CATALOG_SQL_EXECUTE_ENABLED",
+    )
+    catalog_sql_max_display_rows: int = Field(default=50, alias="CATALOG_SQL_MAX_DISPLAY_ROWS")
+    catalog_sql_max_retries_on_execute_error: int = Field(
+        default=1,
+        alias="CATALOG_SQL_MAX_RETRIES_ON_EXECUTE_ERROR",
+    )
+    catalog_sql_validation_repair_enabled: bool = Field(
+        default=True,
+        alias="CATALOG_SQL_VALIDATION_REPAIR_ENABLED",
+    )
+    catalog_sql_validation_repair_timeout_seconds: int = Field(
+        default=45,
+        alias="CATALOG_SQL_VALIDATION_REPAIR_TIMEOUT_SECONDS",
+    )
+    catalog_sql_validation_repair_max_output_tokens: int = Field(
+        default=2048,
+        alias="CATALOG_SQL_VALIDATION_REPAIR_MAX_OUTPUT_TOKENS",
+    )
+    bedrock_catalog_sql_validation_repair_model_id: str | None = Field(
+        default=None,
+        alias="BEDROCK_CATALOG_SQL_VALIDATION_REPAIR_MODEL_ID",
+    )
+    catalog_sql_execute_grace_seconds: int = Field(
+        default=8,
+        alias="CATALOG_SQL_EXECUTE_GRACE_SECONDS",
+    )
+    catalog_sql_skip_repair_on_timeout: bool = Field(
+        default=True,
+        alias="CATALOG_SQL_SKIP_REPAIR_ON_TIMEOUT",
+    )
+    query_generator_request_timeout_seconds: int = Field(
+        default=120,
+        alias="QUERY_GENERATOR_REQUEST_TIMEOUT_SECONDS",
     )
 
     llm_provider: str = Field(default="bedrock", alias="LLM_PROVIDER")
@@ -314,6 +390,12 @@ class AppConfig(BaseSettings):
 
     @property
     def database_url_value(self) -> str | None:
+        """Active warehouse URL for SQL execution, schema introspection, and catalog merge."""
+
+        if self.runtime.is_development and self.use_local_docker_postgres:
+            local = (self.local_database_url or "").strip()
+            if local:
+                return local
         active = self.database.url
         return active.get_secret_value() if active else None
 
@@ -391,6 +473,24 @@ class AppConfig(BaseSettings):
         return self._optional_litellm_model(self.router_llm_model, fallback=self.llm.model)
 
     @property
+    def module_router_llm_model_resolved(self) -> str:
+        """Small/fast model for schema guide module selection (defaults to root/Haiku)."""
+
+        explicit = (self.bedrock_module_router_model_id or "").strip()
+        if explicit:
+            return self._optional_litellm_model(explicit, fallback=self.llm.model)
+        return self.router_llm_model_resolved
+
+    @property
+    def catalog_sql_validation_repair_model_resolved(self) -> str:
+        """Small/fast model for static SQL validation repair (defaults to module router / Haiku)."""
+
+        explicit = (self.bedrock_catalog_sql_validation_repair_model_id or "").strip()
+        if explicit:
+            return self._optional_litellm_model(explicit, fallback=self.llm.model)
+        return self.module_router_llm_model_resolved
+
+    @property
     def query_generator_llm_model_resolved(self) -> str:
         """Large-context catalog SQL author (LiteLLM id).
 
@@ -416,7 +516,9 @@ class AppConfig(BaseSettings):
     def query_generator_max_output_tokens_resolved(self) -> int | None:
         if self.query_generator_max_output_tokens is not None:
             return self.query_generator_max_output_tokens
-        return self.llm_max_output_tokens
+        if self.llm_max_output_tokens is not None:
+            return self.llm_max_output_tokens
+        return 4096
 
     @property
     def dev_database_url_value(self) -> str | None:

@@ -36,9 +36,13 @@ def _choice(content: str) -> MagicMock:
 def test_generate_catalog_sql_query_tool_returns_sql_only(monkeypatch: pytest.MonkeyPatch) -> None:
     import litellm
 
-    trusted = get_config().search.default_dev_arn
+    from app.core.config import get_config as _get_config
+
+    get_config.cache_clear()
+    monkeypatch.setenv("CATALOG_SQL_EXECUTE_ENABLED", "false")
+    trusted = _get_config().search.default_dev_arn
     safe_sql = (
-        "SELECT 1 AS one FROM public.investor i WHERE i.arn_code = %s LIMIT 1"
+        "SELECT 1 AS one FROM public.distributor_investor_mapping WHERE arn_code = %s LIMIT 1"
     )
     payload = json.dumps({"thought": "unit", "sql": safe_sql, "parameters": [trusted]})
 
@@ -48,8 +52,10 @@ def test_generate_catalog_sql_query_tool_returns_sql_only(monkeypatch: pytest.Mo
     out = generate_catalog_sql_query_tool("count investors", ctx)
     assert out["status"] == "ok"
     assert out["sql"] == safe_sql
-    assert "not executed" in (out.get("reply") or "").lower()
-    assert safe_sql in (out.get("reply") or "")
+    assert out["executed"] is False
+    reply = out.get("reply") or ""
+    assert "not executed" in reply.lower() or "execution disabled" in reply.lower()
+    assert trusted in reply or "ARN-" in reply
     assert ctx.state[STATE_KEY_QUERY_GENERATOR_LAST].get("parsed_sql") == safe_sql
     fq = ctx.state[STATE_KEY_FINAL_QUERY]
     assert fq.get("engine") == "catalog_sql_generator"

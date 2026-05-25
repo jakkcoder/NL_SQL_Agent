@@ -1,0 +1,291 @@
+{
+  "module_id": "dormant_holdings",
+  "summary": "Dormant/inactive via customer_schemes.l_trxn_date; zero units via processed_trxns aggregates.",
+  "tables": [
+    {
+      "fully_qualified": "sphmf.customer_schemes",
+      "purpose": "Folio + scheme registration (folio_no, sch_code, div_reinv_flag, l_trxn_date).",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 33,
+      "columns_documented": 33,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "broker_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "distributor ARN / broker code for row scope; character varying nullable"
+        },
+        {
+          "name": "div_reinv_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "l_trxn_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "last transaction date for activity/dormancy windows; timestamp without time zone nullable"
+        },
+        {
+          "name": "sch_code",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "mutual fund scheme code (join to scheme_master.scheme_cd); character varying"
+        },
+        {
+          "name": "acno_valid",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_ac_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_ac_type",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_branch",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_city",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "bank_pincode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "clos_bal_hold",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "create_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "div_pay_mode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "ecs_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "ecs_no_old",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "ecsvalid",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "exchange_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "hold_mode_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "ifsccode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "ifscvalid",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "imps_ac_verified",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "minor_bank_whitelist_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "neftcode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "pledged",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "redeem_div",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "redem_pay_mode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "sub_broker_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "time_stamp",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "total_units",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "update_serial",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        }
+      ],
+      "sample_row": {
+        "broker_code": "ARN-4279",
+        "div_reinv_flag": "Z",
+        "folio_no": "20608729",
+        "l_trxn_date": "2025-07-16T00:00:00",
+        "sch_code": "GFG",
+        "acno_valid": "V",
+        "bank_ac_no": "919010029464467",
+        "bank_ac_type": "SB",
+        "bank_branch": null,
+        "bank_city": "MUMBAI",
+        "bank_name": "AXIS BANK LTD",
+        "bank_pincode": null,
+        "clos_bal_hold": 0.0,
+        "commit_scn": 11042579808633,
+        "create_date": "2025-01-16T00:00:00",
+        "div_pay_mode": "NEFT",
+        "ecs_no": null,
+        "ecs_no_old": null,
+        "ecsvalid": null,
+        "exchange_flag": null,
+        "hold_mode_code": "SI",
+        "ifsccode": "UTIB0002982",
+        "ifscvalid": null,
+        "imps_ac_verified": "Y",
+        "minor_bank_whitelist_flag": null,
+        "neftcode": "UTIB0002982",
+        "pledged": 0.0,
+        "redeem_div": null,
+        "redem_pay_mode": "NEFT",
+        "sub_broker_code": null,
+        "time_stamp": "2025-07-17T03:42:59",
+        "total_units": 152.936,
+        "update_serial": null
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [],
+  "question_patterns": [
+    {
+      "id": "dormant_inactive",
+      "user_examples": [
+        "Dormant / inactive investors",
+        "investors not transacted in certain period",
+        "having 0 units across all schemes"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.customer_schemes",
+        "sphmf.processed_trxns"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "investor_identity"
+      ],
+      "sql_hints": [
+        "Dormant (180d): MAX(DATE(cs.l_trxn_date)) per investor_uuid for ARN folios; filter CURRENT_DATE - max_d >= 180.",
+        "Zero units: NOT EXISTS positive holding from processed_trxns SUM(case trxn_sign +/- units) > 0.",
+        "User may specify months — parameterize interval as %s days or use date literals in thought only via %s."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM (SELECT MAX(DATE(cs.l_trxn_date)) AS last_dt, dim2.investor_uuid     FROM sphmf.customer_schemes cs     JOIN public.distributor_investor_mapping dim2 ON cs.folio_no = dim2.folio_number     WHERE dim2.arn_code = %s AND dim2.investor_uuid = dim.investor_uuid     GROUP BY dim2.investor_uuid) x WHERE CURRENT_DATE - x.last_dt >= %s) ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn",
+        "session_arn",
+        "inactive_days e.g. 180"
+      ]
+    }
+  ],
+  "filter_vocabulary": {
+    "dormant_heuristics": {
+      "no_recent_activity_days": 180,
+      "sql": "MAX(DATE(cs.l_trxn_date)) from sphmf.customer_schemes cs for ARN folios; dormant if CURRENT_DATE - max_d >= 180",
+      "zero_units": "SUM signed units from sphmf.processed_trxns (+ for trxn_sign '+', - for '-') grouped by folio+sch_code HAVING sum <= 0 or no rows"
+    }
+  }
+}

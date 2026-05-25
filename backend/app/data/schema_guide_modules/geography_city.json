@@ -1,0 +1,402 @@
+{
+  "module_id": "geography_city",
+  "summary": "City and folio KYC via sphmf.customer_master; ILIKE on city; name + multi-city OR.",
+  "tables": [
+    {
+      "fully_qualified": "sphmf.customer_master",
+      "purpose": "Folio-level customer/KYC: city, inv_type, names. Join folio_no = dim.folio_number.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 74,
+      "columns_documented": 45,
+      "columns_omitted": 29,
+      "columns": [
+        {
+          "name": "city",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "city name for geography filters (e.g. Mumbai); character varying nullable"
+        },
+        {
+          "name": "email",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "email address; character varying nullable"
+        },
+        {
+          "name": "first_name",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "character varying"
+        },
+        {
+          "name": "folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "inv_type",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "investor type code (join tax_status); character varying"
+        },
+        {
+          "name": "last_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "middle_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "address1",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "address2",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "address3",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "alternate_folio_no",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "folio identifier linking sphmf and public schemas; numeric nullable"
+        },
+        {
+          "name": "application_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "aslstatus",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "birth_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "br_recddt",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "chk_digit",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "contact_person",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "country",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "dp_id",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "email_flg",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "email address; character varying nullable"
+        },
+        {
+          "name": "email_valid",
+          "type": "character",
+          "nullable": "YES",
+          "description": "email address; character nullable"
+        },
+        {
+          "name": "exchid1",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "exchid2",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "father_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "fh_ckyc_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "fh_kyc",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "fh_kyc_type",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "folio_create_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "folio identifier linking sphmf and public schemas; timestamp without time zone nullable"
+        },
+        {
+          "name": "folio_lock_reason",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "folio identifier linking sphmf and public schemas; character varying nullable"
+        },
+        {
+          "name": "folio_lock_reason_codes",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "folio identifier linking sphmf and public schemas; character varying nullable"
+        },
+        {
+          "name": "g_ckyc_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "g_kyc_type",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "gdate_of_birth",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "gender",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "gpan_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "PAN tax id; character varying nullable"
+        },
+        {
+          "name": "guar_kyc",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "guardian_gender",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "guardian_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "guardian_pan_exem_category",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "PAN tax id; character varying nullable"
+        },
+        {
+          "name": "guardian_pan_exem_ref_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "PAN tax id; character varying nullable"
+        },
+        {
+          "name": "guardian_relationship",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "gvalid_pan",
+          "type": "character",
+          "nullable": "YES",
+          "description": "PAN tax id; character nullable"
+        },
+        {
+          "name": "insurance_id",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "insurance_tag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        }
+      ],
+      "sample_row": {
+        "city": "BIRBHUM",
+        "email": "ghoshchandan19@gmail.com",
+        "first_name": "CHANDAN",
+        "folio_no": "14428383",
+        "inv_type": "01",
+        "last_name": "GHOSH",
+        "middle_name": null,
+        "address1": "C/O SAILENDRA NATH GHOSH,GRAM LAUBERIA(EAST) PART",
+        "address2": "LAUBERIA(PART),NEAR KALI MANDIR,LAUBERE,BIRBHUM,WEST",
+        "address3": "BENGAL,731125",
+        "alternate_folio_no": null,
+        "application_no": null,
+        "aslstatus": null,
+        "birth_date": "1991-02-18T00:00:00",
+        "br_recddt": null,
+        "chk_digit": "34",
+        "commit_scn": 10562307388099,
+        "contact_person": null,
+        "country": "101",
+        "dp_id": null,
+        "email_flg": "E",
+        "email_valid": "Y",
+        "exchid1": null,
+        "exchid2": null,
+        "father_name": null,
+        "fh_ckyc_no": null,
+        "fh_kyc": null,
+        "fh_kyc_type": null,
+        "folio_create_date": "2023-10-04T00:00:00",
+        "folio_lock_reason": null,
+        "folio_lock_reason_codes": null,
+        "g_ckyc_no": null,
+        "g_kyc_type": null,
+        "gdate_of_birth": null,
+        "gender": null,
+        "gpan_no": null,
+        "guar_kyc": 1,
+        "guardian_gender": null,
+        "guardian_name": null,
+        "guardian_pan_exem_category": null,
+        "guardian_pan_exem_ref_no": null,
+        "guardian_relationship": null,
+        "gvalid_pan": null,
+        "insurance_id": null,
+        "insurance_tag": null
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [
+    {
+      "name": "folio_kyc_city",
+      "description": "Geography / email / folio-level attributes (e.g. Mumbai).",
+      "sql_pattern": "sphmf.customer_master cm ON cm.folio_no = dim.folio_number WHERE dim.arn_code = %s AND lower(trim(cm.city::text)) ILIKE %s"
+    }
+  ],
+  "question_patterns": [
+    {
+      "id": "city_mumbai",
+      "user_examples": [
+        "Show my investors in Mumbai",
+        "investors from Mumbai location",
+        "Mumbai investors"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.customer_master"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "investor_identity",
+        "folio_kyc_city"
+      ],
+      "sql_hints": [
+        "Return one row per investor: SELECT DISTINCT ON (i.uuid) i.uuid, … then ORDER BY i.uuid (required). Do not emit one row per folio unless the user asks for folio detail.",
+        "City filter: lower(trim(cm.city)) ILIKE '%mumbai%'; parameters after ARN: city pattern as %s."
+      ],
+      "sql_skeleton": "WITH arn_scope AS (SELECT dim.investor_uuid, dim.folio_number FROM public.distributor_investor_mapping dim WHERE dim.arn_code = %s) SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email, cm.city FROM arn_scope JOIN public.investor i ON i.uuid = arn_scope.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = arn_scope.folio_number WHERE lower(trim(cm.city::text)) ILIKE %s ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn",
+        "city_pattern e.g. %mumbai%"
+      ]
+    },
+    {
+      "id": "name_multi_city",
+      "user_examples": [
+        "Investors named 'Bhavin' in Mumbai or Ahmedabad",
+        "name Bhavin Mumbai Ahmedabad"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.customer_master"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "investor_identity",
+        "folio_kyc_city"
+      ],
+      "sql_hints": [
+        "Name filters: match only on normalized full name — lower(replace(trim(concat_ws(' ', coalesce(i.first_name, ''), coalesce(i.last_name, ''))), ' ', '')) ILIKE %s. Never filter with separate first_name = … AND last_name = … or first_name-only ILIKE. Bind one parameter: lowercase, remove all spaces from the user's name, wrap as %%token%% (e.g. 'Aparna Jha' → '%%aparnajha%%'; 'Bhavin' → '%%bhavin%%').",
+        "Cities: (cm.city ILIKE '%mumbai%' OR cm.city ILIKE '%ahmedabad%') — can inline OR use two %s params."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email, cm.city FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = dim.folio_number WHERE dim.arn_code = %s AND lower(replace(trim(concat_ws(' ', coalesce(i.first_name, ''), coalesce(i.last_name, ''))), ' ', '')) ILIKE %s AND (lower(trim(cm.city::text)) ILIKE '%mumbai%' OR lower(trim(cm.city::text)) ILIKE '%ahmedabad%') ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn",
+        "name_pattern e.g. %bhavin% (lowercase, spaces stripped)"
+      ]
+    }
+  ],
+  "filter_vocabulary": {
+    "city_match": "lower(trim(cm.city::text)) ILIKE %s with value like '%mumbai%' (no leading % on user city token only).",
+    "name_search": "lower(replace(trim(concat_ws(' ', coalesce(i.first_name, ''), coalesce(i.last_name, ''))), ' ', '')) ILIKE %s — one %%pattern%% parameter: lowercase, all spaces stripped from the user's name (concat first+last in SQL, not separate column filters)."
+  }
+}

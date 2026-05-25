@@ -181,7 +181,7 @@ class QueryFlowRouterToolOutput(StrictSchemaModel):
 
 
 class GenerateCatalogSqlToolOutput(StrictSchemaModel):
-    """Result of ``generate_catalog_sql_query_tool`` (LLM-generated SQL only; not executed)."""
+    """Result of ``generate_catalog_sql_query_tool`` (generate, optional execute, optional one retry)."""
 
     status: Literal["ok", "error", "blocked"] = "ok"
     reply: str
@@ -189,6 +189,10 @@ class GenerateCatalogSqlToolOutput(StrictSchemaModel):
     sql: str | None = None
     parameters: list[Any] = Field(default_factory=list)
     row_count: int = 0
+    count: int = 0
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    executed: bool = False
+    sql_retry_used: bool = False
     generator_model: str = ""
     validation_error: str | None = None
     execute_error: str | None = None

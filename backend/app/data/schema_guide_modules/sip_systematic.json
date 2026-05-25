@@ -1,0 +1,529 @@
+{
+  "module_id": "sip_systematic",
+  "summary": "Active SIP/STP on sphmf.sipstp (cease_dt, to_date, atrxn_type, amount); scheme_master for hybrid filter.",
+  "tables": [
+    {
+      "fully_qualified": "sphmf.sipstp",
+      "purpose": "Systematic instructions (SIP/STP/SWP): atrxn_type, switch_flag, sch_code, brok_code, dates.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 67,
+      "columns_documented": 45,
+      "columns_omitted": 22,
+      "columns": [
+        {
+          "name": "atrxn_type",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "systematic plan transaction type (SIP/STP/SWP logic); character varying"
+        },
+        {
+          "name": "brok_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "distributor ARN / broker code for row scope; character varying nullable"
+        },
+        {
+          "name": "cancellation_request_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "cease_dt",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "sch_code",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "mutual fund scheme code (join to scheme_master.scheme_cd); character varying"
+        },
+        {
+          "name": "sub_trxn_type",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "switch_flag",
+          "type": "character",
+          "nullable": "YES",
+          "description": "boolean/char flag; character nullable"
+        },
+        {
+          "name": "to_date",
+          "type": "timestamp with time zone",
+          "nullable": "NO",
+          "description": "date/timestamp; timestamp with time zone"
+        },
+        {
+          "name": "ae_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "amc_ref_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "amc_ter_mis_location_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "appl_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "arn_emp_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "atrxn_no",
+          "type": "numeric",
+          "nullable": "NO",
+          "description": "numeric"
+        },
+        {
+          "name": "cams_om_mandate_id_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "camsom_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "cease_initiated_by",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "doc_no",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "entry_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "euin_opted",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "euin_valid",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "ext_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "first_trxn_with_sip",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "free_sip_target_scheme_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "frequency",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "from_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "gain_logic",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "gain_perc",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "gain_value",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "high_low",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "isip_status",
+          "type": "character",
+          "nullable": "YES",
+          "description": "character nullable"
+        },
+        {
+          "name": "location_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "mb_amount",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "mb_redemption_perc",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "mis_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "nigo_reason_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "no_of_instalments",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "old_auto_trxn_no",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "online_mode",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "package_name",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "pause_from_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        },
+        {
+          "name": "pause_to_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp with time zone nullable"
+        }
+      ],
+      "sample_row": {
+        "atrxn_type": "P",
+        "brok_code": "ARN-0098",
+        "cancellation_request_date": null,
+        "cease_dt": null,
+        "folio_no": "7248520",
+        "sch_code": "32",
+        "sub_trxn_type": null,
+        "switch_flag": "X",
+        "to_date": "0001-04-24T00:00:00+00:00 BC",
+        "ae_code": "ARN-0098",
+        "amc_ref_no": null,
+        "amc_ter_mis_location_code": null,
+        "amount": 3000.0,
+        "appl_no": "201404230000001",
+        "arn_emp_code": "E086797",
+        "atrxn_no": 300041,
+        "cams_om_mandate_id_no": null,
+        "camsom_no": null,
+        "cease_initiated_by": null,
+        "commit_scn": null,
+        "doc_no": null,
+        "entry_date": "0001-04-23T00:00:00+00:00 BC",
+        "euin_opted": "Y",
+        "euin_valid": null,
+        "ext_date": "0001-04-24T00:00:00+00:00 BC",
+        "first_trxn_with_sip": null,
+        "free_sip_target_scheme_code": null,
+        "frequency": "OM",
+        "from_date": "2016-11-15T00:00:00+00:00",
+        "gain_logic": null,
+        "gain_perc": 0.0,
+        "gain_value": null,
+        "high_low": null,
+        "isip_status": null,
+        "location_code": "NSEMFSS",
+        "mb_amount": null,
+        "mb_redemption_perc": null,
+        "mis_code": null,
+        "nigo_reason_code": null,
+        "no_of_instalments": 12,
+        "old_auto_trxn_no": null,
+        "online_mode": null,
+        "package_name": null,
+        "pause_from_date": null,
+        "pause_to_date": null
+      },
+      "sample_row_note": null
+    },
+    {
+      "fully_qualified": "sphmf.dtp_regn",
+      "purpose": "Dynamic transfer plan (DTP) registrations.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 13,
+      "columns_documented": 13,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "brok_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "distributor ARN / broker code for row scope; character varying nullable"
+        },
+        {
+          "name": "folio_no",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "folio identifier linking sphmf and public schemas; character varying"
+        },
+        {
+          "name": "cease_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "commit_scn",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "created_authorized_by",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "editor_id",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "regn_date",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "date/timestamp; timestamp without time zone nullable"
+        },
+        {
+          "name": "reinvst_tag",
+          "type": "character",
+          "nullable": "NO",
+          "description": "character"
+        },
+        {
+          "name": "source_sch",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "character varying"
+        },
+        {
+          "name": "target_perc",
+          "type": "numeric",
+          "nullable": "YES",
+          "description": "numeric nullable"
+        },
+        {
+          "name": "target_sch",
+          "type": "character varying",
+          "nullable": "NO",
+          "description": "character varying"
+        },
+        {
+          "name": "time_stamp",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "user_id",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        }
+      ],
+      "sample_row": {
+        "brok_code": "ARN-0411",
+        "folio_no": "5245002",
+        "cease_date": null,
+        "commit_scn": 9727937008874.0,
+        "created_authorized_by": null,
+        "editor_id": null,
+        "regn_date": "2020-05-22T00:00:00",
+        "reinvst_tag": "Z",
+        "source_sch": "LFDTN",
+        "target_perc": 100.0,
+        "target_sch": "AFRG",
+        "time_stamp": "2020-05-22T12:14:41",
+        "user_id": null
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [
+    {
+      "name": "active_sipstp",
+      "description": "Active systematic plans (SIP/STP/SWP families).",
+      "sql_pattern": "sphmf.sipstp s ON dim.folio_number = s.folio_no AND dim.arn_code = s.brok_code JOIN public.scheme_master sm ON s.sch_code = sm.scheme_cd WHERE s.cease_dt IS NULL AND s.to_date > NOW()"
+    },
+    {
+      "name": "sip_amount_active",
+      "description": "Active SIP rows with instalment amount (sipstp.amount) and scheme filter.",
+      "sql_pattern": "sphmf.sipstp s ON dim.folio_number = s.folio_no AND dim.arn_code = s.brok_code JOIN public.scheme_master sm ON s.sch_code = sm.scheme_cd WHERE s.cease_dt IS NULL AND (s.cancellation_request_date IS NULL) AND s.to_date > NOW() AND s.atrxn_type = 'P' AND s.amount >= %s"
+    },
+    {
+      "name": "no_active_sip",
+      "description": "Investors with no live SIP/STP row (NOT EXISTS active sipstp).",
+      "sql_pattern": "NOT EXISTS (SELECT 1 FROM sphmf.sipstp s WHERE s.folio_no = dim.folio_number AND s.brok_code = dim.arn_code AND s.cease_dt IS NULL AND (s.cancellation_request_date IS NULL) AND s.to_date > NOW())"
+    }
+  ],
+  "question_patterns": [
+    {
+      "id": "active_sip_hybrid_min_amount",
+      "user_examples": [
+        "Active SIPs above 5,000 per month in hybrid funds",
+        "SIP more than 5000 hybrid"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.sipstp",
+        "public.scheme_master"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "sip_amount_active"
+      ],
+      "sql_hints": [
+        "Use EXISTS (not wide JOIN) on sipstp + scheme_master; avoid WITH/CTEs that put amount %s before dim.arn_code = %s.",
+        "Active SIP: cease_dt NULL, cancellation_request_date NULL, to_date > NOW(), atrxn_type = 'P'.",
+        "Amount: s.amount >= %s as second parameter (integer, e.g. 5000 for 'above 5,000 per month').",
+        "Hybrid schemes: scheme_type ILIKE '%hybrid%' OR '%balanced%' per filter_vocabulary.scheme_classification.hybrid."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM sphmf.sipstp s   JOIN public.scheme_master sm ON s.sch_code = sm.scheme_cd   WHERE s.folio_no = dim.folio_number AND s.brok_code = dim.arn_code   AND s.cease_dt IS NULL AND s.cancellation_request_date IS NULL AND s.to_date > NOW()   AND s.atrxn_type = 'P' AND s.amount >= %s   AND (lower(sm.scheme_type) LIKE '%%hybrid%%' OR lower(sm.scheme_type) LIKE '%%balanced%%')) ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn",
+        "min_sip_amount"
+      ]
+    },
+    {
+      "id": "no_active_sip",
+      "user_examples": [
+        "Investors with no active SIP",
+        "no live SIP"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.sipstp"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "no_active_sip"
+      ],
+      "sql_hints": [
+        "NOT EXISTS active sipstp row for folio+brok_code; see join_recipe no_active_sip."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND NOT EXISTS (  SELECT 1 FROM sphmf.sipstp s WHERE s.folio_no = dim.folio_number AND s.brok_code = dim.arn_code   AND s.cease_dt IS NULL AND s.cancellation_request_date IS NULL AND s.to_date > NOW()) ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn"
+      ]
+    }
+  ],
+  "filter_vocabulary": {
+    "sipstp_active": {
+      "predicates": [
+        "s.cease_dt IS NULL",
+        "s.cancellation_request_date IS NULL",
+        "s.to_date IS NOT NULL AND s.to_date > NOW()",
+        "s.atrxn_type = 'P' for vanilla SIP (see systematic_plans in filter catalog)"
+      ],
+      "amount_column": "sphmf.sipstp.amount (numeric instalment; compare >= threshold for 'above 5000 per month')"
+    },
+    "scheme_classification": {
+      "equity": "lower(sm.scheme_type) LIKE '%equity%' OR EXISTS on sphmf.scheme_setup (ss.schcode = pt.sch_code AND lower(ss.asset_class) = 'equity'); public.scheme_master has scheme_type/scheme_name only (no asset_class).",
+      "hybrid": "lower(sm.scheme_type) LIKE '%hybrid%' OR lower(sm.scheme_type) LIKE '%balanced%'",
+      "liquid_cash": "lower(sm.scheme_type) LIKE '%liquid%' OR lower(sm.scheme_name) LIKE '%liquid%' OR lower(ss.schname) LIKE '%liquid%' via scheme_setup ss on pt.sch_code = ss.schcode",
+      "cgf": "sch_code IN (SELECT schcode FROM sphmf.scheme_setup WHERE cgf_flag = 'C' AND plan_type <> 'D')"
+    }
+  }
+}

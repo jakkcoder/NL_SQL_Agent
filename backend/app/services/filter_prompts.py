@@ -8,7 +8,9 @@ from app.services.filter_catalog import get_filter_catalog_for_session
 SOURCE_OF_TRUTH_NOTICE = """
 FILTER CATALOG (source of truth):
 The ``generate_catalog_sql_query_tool`` sends only ``investor_db_schema_guide.json`` plus the
-user question (no live DB catalog merge).
+user question (no live DB catalog merge). Age filters use ``public.investor.dob`` with ``AGE(dob)``;
+city filters use ``sphmf.customer_master.city`` per guide join recipes — always call the tool for
+these asks; do not claim age or location data is unavailable without a tool result.
 When reasoning about filters in your replies to the user, treat catalog-backed semantics as
 authoritative — do not invent filter values.
 """.strip()

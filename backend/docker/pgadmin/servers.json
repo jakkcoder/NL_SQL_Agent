@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "NL SQL Agent (local clone)",
+      "Group": "Local",
+      "Host": "investor-postgres-local",
+      "Port": 5432,
+      "MaintenanceDB": "investor_db_local",
+      "Username": "localdev",
+      "SSLMode": "prefer",
+      "Comment": "Docker Compose service; password is LOCAL_PG_PASSWORD (default localdev)"
+    }
+  }
+}

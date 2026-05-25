@@ -13,6 +13,8 @@ Compact natural-language schema for LLM read-only SQL generation. Each table inc
 - **identifiers**: Use only tables/columns listed under tables[].columns in this guide.
 - **joins**: Prefer join_recipes; match folio_no/folio_number and sch_code/scheme_cd consistently.
 - **advanced**: Use EXISTS subqueries for holdings/activity/SIP filters; AGE(dob) for age; ILIKE for city; aggregate HAVING for unit balances.
+- **question_patterns**: Before writing SQL, match the user question to question_patterns[].user_examples; follow that pattern's sql_hints and sql_skeleton (parameterize with %s).
+- **performance**: Prefer EXISTS subqueries scoped to arn_scope; avoid joining sipstp/processed_trxns to investor without folio+broker predicates; always LIMIT <= 500.
 
 ## Join recipes
 
@@ -68,6 +70,185 @@ sphmf.customer_master cm JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_
 Capital gains feeder (CGF) scheme filter.
 ```sql
 sphmf.scheme_setup WHERE cgf_flag = 'C' AND plan_type <> 'D'
+```
+
+### nri_tax_status
+NRI / NRE investors via folio inv_type and tax_status.nri_nre.
+```sql
+sphmf.customer_master cm ON cm.folio_no = dim.folio_number JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_code WHERE dim.arn_code = %s AND ts.nri_nre = 'Y'
+```
+
+### redemption_activity
+Redemption posted transactions in a date window (join transaction_types).
+```sql
+sphmf.processed_trxns pt ON pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod WHERE pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R' AND pt.l_trxn_date >= %s AND pt.l_trxn_date < %s
+```
+
+### purchase_activity
+Purchase posted transactions (for top-N / FY totals).
+```sql
+sphmf.processed_trxns pt ON pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod WHERE pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'P' AND pt.l_trxn_date >= %s AND pt.l_trxn_date < %s
+```
+
+### sip_amount_active
+Active SIP rows with instalment amount (sipstp.amount) and scheme filter.
+```sql
+sphmf.sipstp s ON dim.folio_number = s.folio_no AND dim.arn_code = s.brok_code JOIN public.scheme_master sm ON s.sch_code = sm.scheme_cd WHERE s.cease_dt IS NULL AND (s.cancellation_request_date IS NULL) AND s.to_date > NOW() AND s.atrxn_type = 'P' AND s.amount >= %s
+```
+
+### no_active_sip
+Investors with no live SIP/STP row (NOT EXISTS active sipstp).
+```sql
+NOT EXISTS (SELECT 1 FROM sphmf.sipstp s WHERE s.folio_no = dim.folio_number AND s.brok_code = dim.arn_code AND s.cease_dt IS NULL AND (s.cancellation_request_date IS NULL) AND s.to_date > NOW())
+```
+
+## Filter vocabulary
+
+```json
+{
+  "arn_scope": "First parameter is always session_arn; every query uses distributor_investor_mapping.arn_code = %s.",
+  "city_match": "lower(trim(cm.city::text)) ILIKE %s with value like '%mumbai%' (no leading % on user city token only).",
+  "age_years": "EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int BETWEEN min AND max; require i.dob IS NOT NULL.",
+  "activity": {
+    "purchase": "pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'P'",
+    "redemption": "pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R'",
+    "sip_posted": "pt.trxn_subtype_code = 'S' AND tt.trxndbcr = 'P'"
+  },
+  "sipstp_active": {
+    "predicates": [
+      "s.cease_dt IS NULL",
+      "s.cancellation_request_date IS NULL",
+      "s.to_date IS NOT NULL AND s.to_date > NOW()",
+      "s.atrxn_type = 'P' for vanilla SIP (see systematic_plans in filter catalog)"
+    ],
+    "amount_column": "sphmf.sipstp.amount (numeric instalment; compare >= threshold for 'above 5000 per month')"
+  },
+  "scheme_classification": {
+    "equity": "lower(sm.asset_class) = 'equity' OR lower(sm.scheme_type) LIKE '%equity%'",
+    "hybrid": "lower(sm.scheme_type) LIKE '%hybrid%' OR lower(sm.scheme_type) LIKE '%balanced%'",
+    "liquid_cash": "lower(sm.scheme_type) LIKE '%liquid%' OR lower(sm.schname) LIKE '%liquid%'",
+    "cgf": "sch_code IN (SELECT schcode FROM sphmf.scheme_setup WHERE cgf_flag = 'C' AND plan_type <> 'D')"
+  },
+  "dormant_heuristics": {
+    "no_recent_activity_days": 180,
+    "sql": "MAX(DATE(cs.l_trxn_date)) from sphmf.customer_schemes cs for ARN folios; dormant if CURRENT_DATE - max_d >= 180",
+    "zero_units": "SUM signed units from sphmf.processed_trxns (+ for trxn_sign '+', - for '-') grouped by folio+sch_code HAVING sum <= 0 or no rows"
+  },
+  "financial_year_fy25": {
+    "india_fy": "FY25 = 2025-04-01 inclusive to 2026-04-01 exclusive on pt.l_trxn_date",
+    "note": "Adjust bounds if user names a different FY explicitly."
+  },
+  "last_calendar_quarter": "date_trunc('quarter', CURRENT_DATE) - interval '3 months' as start, date_trunc('quarter', CURRENT_DATE) as end",
+  "nri": "public.tax_status.nri_nre = 'Y' joined via sphmf.customer_master.inv_type = tax_status.inv_type_code",
+  "minor": "tax_status.minor_flag = 'Y' AND tax_status.distributor_flag = 'Y' AND tax_status.active_flag = 'Y'",
+  "name_search": "lower(i.first_name) ILIKE %s OR lower(i.last_name) ILIKE %s OR lower(concat_ws(' ', i.first_name, i.last_name)) ILIKE %s"
+}
+```
+
+## Question patterns (NL → SQL)
+
+### city_mumbai
+**Examples:** Show my investors in Mumbai; investors from Mumbai location; Mumbai investors
+- Use DISTINCT ON (i.uuid) or GROUP BY i.uuid if multiple folios per investor.
+- City filter: lower(trim(cm.city)) ILIKE '%mumbai%'; parameters after ARN: city pattern as %s.
+
+```sql
+WITH arn_scope AS (SELECT dim.investor_uuid, dim.folio_number FROM public.distributor_investor_mapping dim WHERE dim.arn_code = %s) SELECT i.first_name, i.last_name, i.email, cm.city FROM arn_scope JOIN public.investor i ON i.uuid = arn_scope.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = arn_scope.folio_number WHERE lower(trim(cm.city::text)) ILIKE %s LIMIT 500
+```
+
+### age_range
+**Examples:** Investor with Age between 30 and 40; investors aged 30-40
+- Filter on public.investor.dob; use EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int BETWEEN %s AND %s.
+- Age bounds are integers in parameters after session_arn (not inlined).
+
+```sql
+SELECT i.first_name, i.last_name, i.email, i.dob, EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int AS age_years FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND i.dob IS NOT NULL AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, i.dob))::int BETWEEN %s AND %s LIMIT 500
+```
+
+### redemption_equity_last_quarter
+**Examples:** Investors who did redemption in last quarter for equity funds; redemption last quarter equity
+- Use EXISTS on processed_trxns + transaction_types for redemption (trxndbcr='R', trxn_subtype_code='N').
+- Date window: last completed calendar quarter (see filter_vocabulary.last_calendar_quarter).
+- Equity: JOIN scheme_master sm ON pt.sch_code = sm.scheme_cd AND equity predicate from filter_vocabulary.
+- Scope pt.broker_code = session_arn.
+
+```sql
+SELECT DISTINCT i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM sphmf.processed_trxns pt   JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod   JOIN public.scheme_master sm ON pt.sch_code = sm.scheme_cd   WHERE pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code   AND pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'R'   AND pt.l_trxn_date >= %s AND pt.l_trxn_date < %s   AND (lower(sm.asset_class) = 'equity' OR lower(sm.scheme_type) LIKE '%%equity%%')) LIMIT 500
+```
+
+### active_sip_hybrid_min_amount
+**Examples:** Active SIPs above 5,000 per month in hybrid funds; SIP more than 5000 hybrid
+- Use EXISTS (not wide JOIN) on sipstp + scheme_master.
+- Active SIP: cease_dt NULL, cancellation_request_date NULL, to_date > NOW(), atrxn_type = 'P'.
+- Amount: s.amount >= 5000 (parameterize threshold as %s).
+- Hybrid schemes: scheme_type ILIKE '%hybrid%' OR '%balanced%' per filter_vocabulary.scheme_classification.hybrid.
+
+```sql
+SELECT DISTINCT i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM sphmf.sipstp s   JOIN public.scheme_master sm ON s.sch_code = sm.scheme_cd   WHERE s.folio_no = dim.folio_number AND s.brok_code = dim.arn_code   AND s.cease_dt IS NULL AND s.cancellation_request_date IS NULL AND s.to_date > NOW()   AND s.atrxn_type = 'P' AND s.amount >= %s   AND (lower(sm.scheme_type) LIKE '%%hybrid%%' OR lower(sm.scheme_type) LIKE '%%balanced%%')) LIMIT 500
+```
+
+### dormant_inactive
+**Examples:** Dormant / inactive investors; investors not transacted in certain period; having 0 units across all schemes
+- Dormant (180d): MAX(DATE(cs.l_trxn_date)) per investor_uuid for ARN folios; filter CURRENT_DATE - max_d >= 180.
+- Zero units: NOT EXISTS positive holding from processed_trxns SUM(case trxn_sign +/- units) > 0.
+- User may specify months — parameterize interval as %s days or use date literals in thought only via %s.
+
+```sql
+SELECT i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM (SELECT MAX(DATE(cs.l_trxn_date)) AS last_dt, dim2.investor_uuid     FROM sphmf.customer_schemes cs     JOIN public.distributor_investor_mapping dim2 ON cs.folio_no = dim2.folio_number     WHERE dim2.arn_code = %s AND dim2.investor_uuid = dim.investor_uuid     GROUP BY dim2.investor_uuid) x WHERE CURRENT_DATE - x.last_dt >= %s) LIMIT 500
+```
+
+### top_purchases_fy25
+**Examples:** Top 20 investors by purchases in FY25; top investors by purchase amount FY25
+- Aggregate SUM(pt.amount) or COUNT(*) for purchases (trxndbcr='P', trxn_subtype_code='N').
+- FY25 window: 2025-04-01 to 2026-04-01 on pt.l_trxn_date (see filter_vocabulary.financial_year_fy25).
+- ORDER BY total DESC LIMIT 20 (user top N).
+
+```sql
+SELECT i.first_name, i.last_name, i.email, SUM(pt.amount) AS purchase_total FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.processed_trxns pt ON pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code JOIN sphmf.transaction_types tt ON pt.trxn_type_code = tt.trxntypcod WHERE dim.arn_code = %s AND pt.trxn_subtype_code = 'N' AND tt.trxndbcr = 'P' AND pt.l_trxn_date >= %s AND pt.l_trxn_date < %s GROUP BY i.uuid, i.first_name, i.last_name, i.email ORDER BY purchase_total DESC LIMIT 20
+```
+
+### name_multi_city
+**Examples:** Investors named 'Bhavin' in Mumbai or Ahmedabad; name Bhavin Mumbai Ahmedabad
+- Name: lower(i.first_name) ILIKE %s OR lower(i.last_name) ILIKE %s (pattern '%bhavin%').
+- Cities: (cm.city ILIKE '%mumbai%' OR cm.city ILIKE '%ahmedabad%') — can inline OR use two %s params.
+
+```sql
+SELECT DISTINCT i.first_name, i.last_name, i.email, cm.city FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = dim.folio_number WHERE dim.arn_code = %s AND (lower(i.first_name) ILIKE %s OR lower(i.last_name) ILIKE %s) AND (lower(trim(cm.city::text)) ILIKE '%mumbai%' OR lower(trim(cm.city::text)) ILIKE '%ahmedabad%') LIMIT 500
+```
+
+### nri_investors
+**Examples:** NRI investors; show NRI clients
+- Filter tax_status.nri_nre = 'Y' joined via customer_master.inv_type.
+
+```sql
+SELECT DISTINCT i.first_name, i.last_name, i.email, ts.inv_type_desc FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = dim.folio_number JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_code WHERE dim.arn_code = %s AND ts.nri_nre = 'Y' LIMIT 500
+```
+
+### minor_not_in_cgf
+**Examples:** Minor Investors not invested in CGF schemes; minors without CGF
+- Minor: tax_status.minor_flag='Y' AND distributor_flag='Y' AND active_flag='Y'.
+- NOT invested in CGF: NOT EXISTS customer_schemes row with sch_code in scheme_setup CGF list (cgf_flag='C', plan_type<>'D').
+
+```sql
+SELECT DISTINCT i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = dim.folio_number JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_code WHERE dim.arn_code = %s AND ts.minor_flag = 'Y' AND ts.distributor_flag = 'Y' AND ts.active_flag = 'Y' AND NOT EXISTS (  SELECT 1 FROM sphmf.customer_schemes cs   WHERE cs.folio_no = dim.folio_number AND cs.sch_code IN (    SELECT schcode FROM sphmf.scheme_setup WHERE cgf_flag = 'C' AND plan_type <> 'D')) LIMIT 500
+```
+
+### no_active_sip
+**Examples:** Investors with no active SIP; no live SIP
+- NOT EXISTS active sipstp row for folio+brok_code; see join_recipe no_active_sip.
+
+```sql
+SELECT i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND NOT EXISTS (  SELECT 1 FROM sphmf.sipstp s WHERE s.folio_no = dim.folio_number AND s.brok_code = dim.arn_code   AND s.cease_dt IS NULL AND s.cancellation_request_date IS NULL AND s.to_date > NOW()) LIMIT 500
+```
+
+### liquid_only_funds
+**Examples:** Investors with investment only in Liquid / cash funds; only liquid fund holders
+- Investors who HAVE positive units only in liquid schemes AND have NO positive units in non-liquid schemes.
+- Use two EXISTS / NOT EXISTS on aggregated processed_trxns by folio with scheme_master classification.
+- Liquid predicate from filter_vocabulary.scheme_classification.liquid_cash.
+
+```sql
+SELECT i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid WHERE dim.arn_code = %s AND EXISTS (  SELECT 1 FROM sphmf.processed_trxns pt   JOIN public.scheme_master sm ON pt.sch_code = sm.scheme_cd   WHERE pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code   AND (lower(sm.scheme_type) LIKE '%%liquid%%' OR lower(sm.schname) LIKE '%%liquid%%')   GROUP BY pt.folio_no, pt.sch_code HAVING SUM(CASE WHEN pt.trxn_sign = '+' THEN pt.units     WHEN pt.trxn_sign = '-' THEN -pt.units ELSE 0 END) > 0) AND NOT EXISTS (  SELECT 1 FROM sphmf.processed_trxns pt   JOIN public.scheme_master sm ON pt.sch_code = sm.scheme_cd   WHERE pt.folio_no = dim.folio_number AND pt.broker_code = dim.arn_code   AND NOT (lower(sm.scheme_type) LIKE '%%liquid%%' OR lower(sm.schname) LIKE '%%liquid%%')   GROUP BY pt.folio_no, pt.sch_code HAVING SUM(CASE WHEN pt.trxn_sign = '+' THEN pt.units     WHEN pt.trxn_sign = '-' THEN -pt.units ELSE 0 END) > 0) LIMIT 500
 ```
 
 ## Tables

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from functools import lru_cache
 import re
 import sqlite3
 from datetime import date, datetime, timezone
@@ -16,6 +17,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID
+
+from app.services.investor_schema_question_patterns import enrich_investor_schema_guide
 
 logger = logging.getLogger(__name__)
 
@@ -536,7 +539,7 @@ def build_schema_guide(
         elif database_url:
             entry["sample_row_note"] = "No row returned (empty table or fetch failed)."
 
-    return {
+    guide: dict[str, Any] = {
         "contract_kind": "investor_schema_guide",
         "source_contract_kind": contract.get("contract_kind"),
         "source_generated_at": contract.get("generated_at"),
@@ -558,11 +561,20 @@ def build_schema_guide(
                 "Use EXISTS subqueries for holdings/activity/SIP filters; "
                 "AGE(dob) for age; ILIKE for city; aggregate HAVING for unit balances."
             ),
+            "investor_row_dedup": (
+                "One row per investor (i.uuid): SELECT DISTINCT ON (i.uuid) i.uuid, … ORDER BY i.uuid, "
+                "or GROUP BY i.uuid for aggregates; mapping table is per-folio."
+            ),
+            "investor_name_search": (
+                "Name ILIKE on lower(replace(trim(concat_ws(' ', coalesce(first_name,''), coalesce(last_name,''))), "
+                "' ', '')) with lowercase space-stripped %pattern% parameter; never split first/last equality."
+            ),
         },
         "join_recipes": JOIN_RECIPES,
         "tables": tables_out,
         "table_count": len(tables_out),
     }
+    return enrich_investor_schema_guide(guide)
 
 
 def guide_to_markdown(guide: dict[str, Any]) -> str:
@@ -586,6 +598,32 @@ def guide_to_markdown(guide: dict[str, Any]) -> str:
         lines.append(jr.get("description", ""))
         lines.append(f"```sql\n{jr.get('sql_pattern', '')}\n```")
         lines.append("")
+    vocab = guide.get("filter_vocabulary")
+    if isinstance(vocab, dict) and vocab:
+        lines.extend(["## Filter vocabulary", ""])
+        lines.append("```json")
+        lines.append(json.dumps(vocab, indent=2, ensure_ascii=False, default=str))
+        lines.append("```")
+        lines.append("")
+    patterns = guide.get("question_patterns")
+    if isinstance(patterns, list) and patterns:
+        lines.extend(["## Question patterns (NL → SQL)", ""])
+        for qp in patterns:
+            if not isinstance(qp, dict):
+                continue
+            lines.append(f"### {qp.get('id', 'pattern')}")
+            examples = qp.get("user_examples") or []
+            if examples:
+                lines.append("**Examples:** " + "; ".join(str(e) for e in examples[:4]))
+            for hint in qp.get("sql_hints") or []:
+                lines.append(f"- {hint}")
+            sk = qp.get("sql_skeleton")
+            if sk:
+                lines.append("")
+                lines.append("```sql")
+                lines.append(str(sk).strip())
+                lines.append("```")
+            lines.append("")
     lines.extend(["## Tables", ""])
     for t in guide.get("tables") or []:
         fq = t.get("fully_qualified")
@@ -637,14 +675,16 @@ def write_schema_guide_files(
     return jp, mp
 
 
+@lru_cache(maxsize=1)
 def load_schema_guide() -> dict[str, Any] | None:
     path = GUIDE_JSON_PATH
     if not path.is_file():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    return enrich_investor_schema_guide(raw)
 
 
 def schema_guide_for_sql_generator(
@@ -663,8 +703,39 @@ def schema_guide_for_sql_generator(
     return build_schema_guide(contract, filter_catalog=filter_catalog)
 
 
+def slim_schema_guide_for_prompt(guide: dict[str, Any]) -> dict[str, Any]:
+    """Drop sample rows and metadata bloat before sending the monolithic guide to the LLM."""
+
+    out = {k: v for k, v in guide.items() if k != "tables"}
+    tables = []
+    for table in guide.get("tables") or []:
+        if not isinstance(table, dict):
+            continue
+        tables.append(
+            {
+                "fully_qualified": table.get("fully_qualified"),
+                "purpose": table.get("purpose"),
+                "columns": [
+                    {
+                        "name": c.get("name"),
+                        "type": c.get("type"),
+                        "description": c.get("description"),
+                    }
+                    for c in table.get("columns") or []
+                    if isinstance(c, dict)
+                ],
+            }
+        )
+    out["tables"] = tables
+    return out
+
+
 def serialize_schema_guide_for_prompt(guide: dict[str, Any], max_chars: int) -> str:
-    raw = json.dumps(guide, ensure_ascii=True, default=str)
+    if guide.get("payload_kind") == "modular_sections":
+        payload = guide
+    else:
+        payload = slim_schema_guide_for_prompt(guide)
+    raw = json.dumps(payload, ensure_ascii=True, default=str)
     if len(raw) <= max_chars:
         return raw
     return raw[: max_chars - 80] + "\n...(investor_schema_guide_json truncated for prompt size)\n"

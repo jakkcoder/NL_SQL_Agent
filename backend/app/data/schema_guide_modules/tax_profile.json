@@ -1,0 +1,280 @@
+{
+  "module_id": "tax_profile",
+  "summary": "NRI (tax_status.nri_nre), minor (minor_flag), CGF scheme membership.",
+  "tables": [
+    {
+      "fully_qualified": "public.tax_status",
+      "purpose": "Lookup for investor type codes (inv_type_code) with minor/distributor/active flags.",
+      "partition_key_def": null,
+      "primary_key_columns": [],
+      "foreign_keys": [],
+      "column_count_total": 27,
+      "columns_documented": 27,
+      "columns_omitted": 0,
+      "columns": [
+        {
+          "name": "active_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "distributor_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "minor_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "add_bank_cheque_leaf_enabled",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "banned_investors_flag",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean/char flag; boolean nullable"
+        },
+        {
+          "name": "check_fatca",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "cobm_enabled",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "concat_updation_enable",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "corporate_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "created_date",
+          "type": "date",
+          "nullable": "YES",
+          "description": "date/timestamp; date nullable"
+        },
+        {
+          "name": "created_time",
+          "type": "timestamp without time zone",
+          "nullable": "YES",
+          "description": "timestamp without time zone nullable"
+        },
+        {
+          "name": "div_status_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "emandate_enabled",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "folio_creation_enabled",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "folio identifier linking sphmf and public schemas; boolean nullable"
+        },
+        {
+          "name": "form15gh_applicable",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": "NO",
+          "description": "uuid"
+        },
+        {
+          "name": "individual_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "inv_type_code",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "code lookup key; character varying nullable"
+        },
+        {
+          "name": "inv_type_desc",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "investor_flag",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "boolean/char flag; character varying nullable"
+        },
+        {
+          "name": "minor",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "nominee",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "nri_nre",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "quick_investment_enabled",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        },
+        {
+          "name": "retirement_scheme_enable",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "ubo_enabled",
+          "type": "character varying",
+          "nullable": "YES",
+          "description": "character varying nullable"
+        },
+        {
+          "name": "update_contact_detail",
+          "type": "boolean",
+          "nullable": "YES",
+          "description": "boolean nullable"
+        }
+      ],
+      "sample_row": {
+        "active_flag": "Y",
+        "distributor_flag": "Y",
+        "minor_flag": "N",
+        "add_bank_cheque_leaf_enabled": true,
+        "banned_investors_flag": true,
+        "check_fatca": "N",
+        "cobm_enabled": true,
+        "concat_updation_enable": "Y",
+        "corporate_flag": null,
+        "created_date": null,
+        "created_time": null,
+        "div_status_flag": null,
+        "emandate_enabled": false,
+        "folio_creation_enabled": true,
+        "form15gh_applicable": false,
+        "id": "dde164f0-7a69-4f75-9b2f-7556360f0f81",
+        "individual_flag": "Y",
+        "inv_type_code": "70",
+        "inv_type_desc": "Person of Indian Origin [PIO]",
+        "investor_flag": "Y",
+        "minor": null,
+        "nominee": null,
+        "nri_nre": "Y",
+        "quick_investment_enabled": true,
+        "retirement_scheme_enable": "Y",
+        "ubo_enabled": "N",
+        "update_contact_detail": true
+      },
+      "sample_row_note": null
+    }
+  ],
+  "join_recipes": [
+    {
+      "name": "minor_tax_status",
+      "description": "Minor investor subtype via tax status flags.",
+      "sql_pattern": "sphmf.customer_master cm JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_code WHERE ts.minor_flag = 'Y' AND ts.distributor_flag = 'Y'"
+    },
+    {
+      "name": "nri_tax_status",
+      "description": "NRI / NRE investors via folio inv_type and tax_status.nri_nre.",
+      "sql_pattern": "sphmf.customer_master cm ON cm.folio_no = dim.folio_number JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_code WHERE dim.arn_code = %s AND ts.nri_nre = 'Y'"
+    }
+  ],
+  "question_patterns": [
+    {
+      "id": "nri_investors",
+      "user_examples": [
+        "NRI investors",
+        "show NRI clients"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.customer_master",
+        "public.tax_status"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "nri_tax_status"
+      ],
+      "sql_hints": [
+        "Filter tax_status.nri_nre = 'Y' joined via customer_master.inv_type."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email, ts.inv_type_desc FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = dim.folio_number JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_code WHERE dim.arn_code = %s AND ts.nri_nre = 'Y' ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn"
+      ]
+    },
+    {
+      "id": "minor_not_in_cgf",
+      "user_examples": [
+        "Minor Investors not invested in CGF schemes",
+        "minors without CGF"
+      ],
+      "tables": [
+        "public.distributor_investor_mapping",
+        "public.investor",
+        "sphmf.customer_master",
+        "public.tax_status",
+        "sphmf.scheme_setup",
+        "sphmf.customer_schemes"
+      ],
+      "join_recipes": [
+        "arn_scope_anchor",
+        "minor_tax_status",
+        "cgf_schemes"
+      ],
+      "sql_hints": [
+        "Minor: tax_status.minor_flag='Y' AND distributor_flag='Y' AND active_flag='Y'.",
+        "NOT invested in CGF: NOT EXISTS customer_schemes row with sch_code in scheme_setup CGF list (cgf_flag='C', plan_type<>'D')."
+      ],
+      "sql_skeleton": "SELECT DISTINCT ON (i.uuid) i.uuid, i.first_name, i.last_name, i.email FROM public.distributor_investor_mapping dim JOIN public.investor i ON i.uuid = dim.investor_uuid JOIN sphmf.customer_master cm ON cm.folio_no = dim.folio_number JOIN public.tax_status ts ON cm.inv_type = ts.inv_type_code WHERE dim.arn_code = %s AND ts.minor_flag = 'Y' AND ts.distributor_flag = 'Y' AND ts.active_flag = 'Y' AND NOT EXISTS (  SELECT 1 FROM sphmf.customer_schemes cs   WHERE cs.folio_no = dim.folio_number AND cs.sch_code IN (    SELECT schcode FROM sphmf.scheme_setup WHERE cgf_flag = 'C' AND plan_type <> 'D')) ORDER BY i.uuid LIMIT 500",
+      "parameters_order": [
+        "session_arn"
+      ]
+    }
+  ],
+  "filter_vocabulary": {
+    "nri": "public.tax_status.nri_nre = 'Y' joined via sphmf.customer_master.inv_type = tax_status.inv_type_code",
+    "minor": "tax_status.minor_flag = 'Y' AND tax_status.distributor_flag = 'Y' AND tax_status.active_flag = 'Y'"
+  }
+}
