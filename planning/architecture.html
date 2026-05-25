@@ -3,895 +3,518 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NL SQL Agent — Architecture (current)</title>
+  <title>NL SQL Agent — Architecture</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     :root {
       --bg: #0b0f14;
       --surface: #151c28;
-      --surface2: #1c2638;
       --border: #2d3a4f;
       --text: #e7ecf3;
       --muted: #8b9cb3;
       --accent: #3b82f6;
-      --det: #10b981;
-      --warn: #f59e0b;
       --guide: #a78bfa;
-      --guide-bg: #3b2667;
       --llm: #60a5fa;
-      --legacy: #64748b;
+      --det: #10b981;
     }
     * { box-sizing: border-box; }
     body {
-      font-family: "Segoe UI", system-ui, sans-serif;
+      font-family: system-ui, "Segoe UI", sans-serif;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.55;
       margin: 0;
-      padding: 1.5rem 2rem 4rem;
-      max-width: 1280px;
+      padding: 1.25rem 1.5rem 3rem;
+      max-width: 1100px;
       margin-inline: auto;
     }
-    nav.toc {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      margin: 1rem 0 2rem;
-      font-size: 0.85rem;
-    }
-    nav.toc a { color: var(--llm); text-decoration: none; margin-right: 1rem; }
-    nav.toc a:hover { text-decoration: underline; }
-    h1 { font-size: 1.65rem; margin-bottom: 0.2rem; }
-    h2 {
-      font-size: 1.15rem;
-      margin-top: 2.25rem;
-      padding-bottom: 0.4rem;
-      border-bottom: 1px solid var(--border);
-      color: var(--accent);
-    }
-    h3 { font-size: 0.95rem; color: var(--muted); margin-top: 1.25rem; }
-    p.lead { color: var(--muted); font-size: 0.9rem; }
-    .legend {
-      display: flex; flex-wrap: wrap; gap: 0.5rem 1rem;
-      font-size: 0.75rem; margin: 0.75rem 0;
-    }
-    .legend span {
-      padding: 0.2rem 0.55rem;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-    }
-    .legend .guide { background: var(--guide-bg); border-color: var(--guide); color: var(--guide); }
-    .legend .llm { border-color: var(--llm); color: var(--llm); }
-    .legend .det { border-color: var(--det); color: var(--det); }
-    .legend .db { border-color: var(--warn); color: var(--warn); }
-    .legend .state { border-color: #f472b6; color: #f472b6; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.35rem; }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin: 0; max-width: 52rem; }
+    nav {
+      display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+      margin: 1rem 0 1.25rem;
       font-size: 0.8rem;
-      margin: 0.75rem 0;
     }
-    th, td {
-      border: 1px solid var(--border);
-      padding: 0.45rem 0.65rem;
-      text-align: left;
-      vertical-align: top;
+    nav a { color: var(--llm); text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem;
+      font-size: 0.72rem; color: var(--muted); margin-bottom: 1.5rem;
     }
-    th { background: var(--surface2); color: var(--muted); }
-    code { font-family: ui-monospace, monospace; font-size: 0.78rem; color: #93c5fd; }
+    .legend span { padding: 0.15rem 0.5rem; border-radius: 4px; border: 1px solid var(--border); }
+    .legend .guide { color: var(--guide); border-color: var(--guide); }
+    .legend .llm { color: var(--llm); border-color: var(--llm); }
+    .legend .det { color: var(--det); border-color: var(--det); }
+    section {
+      margin-bottom: 2.5rem;
+      scroll-margin-top: 1rem;
+    }
+    h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin: 0 0 0.75rem;
+    }
     .diagram {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem;
-      margin: 0.75rem 0;
+      border-radius: 10px;
+      padding: 1.25rem 1rem;
       overflow-x: auto;
     }
-    .diagram-e2e {
-      padding: 1.5rem 2rem 2rem;
-      overflow: auto;
+    .diagram .mermaid { display: flex; justify-content: center; min-height: 80px; }
+    .caption {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.65rem;
+      line-height: 1.45;
     }
-    .diagram-e2e .mermaid { display: inline-block; overflow: visible; }
-    .diagram-e2e svg { max-width: none !important; display: block; }
-    .callout {
-      border-left: 3px solid var(--guide);
-      background: var(--guide-bg);
-      padding: 0.75rem 1rem;
-      margin: 1rem 0;
-      font-size: 0.85rem;
-      border-radius: 0 6px 6px 0;
-    }
-    .callout strong { color: var(--guide); }
-    details.legacy {
-      margin-top: 2rem;
+    .caption code { font-size: 0.75rem; color: #93c5fd; }
+    details {
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 0.5rem 1rem 1rem;
       background: var(--surface);
+      margin-top: 2rem;
     }
-    details.legacy summary {
+    details summary {
       cursor: pointer;
-      color: var(--legacy);
-      font-size: 0.9rem;
-      padding: 0.5rem 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+      padding: 0.35rem 0;
     }
-    footer { margin-top: 2rem; font-size: 0.72rem; color: var(--muted); }
+    footer {
+      margin-top: 2rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--llm); }
+    .cost-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      margin-top: 0.75rem;
+    }
+    .cost-panel h3 {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin: 1.1rem 0 0.5rem;
+      font-weight: 600;
+    }
+    .cost-panel h3:first-child { margin-top: 0; }
+    table.cost {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.76rem;
+      margin: 0.35rem 0 0.5rem;
+    }
+    table.cost th, table.cost td {
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.55rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    table.cost th { background: #1c2638; color: var(--muted); font-weight: 600; }
+    table.cost td.num { text-align: right; white-space: nowrap; }
+    table.cost tr.total td { font-weight: 600; color: var(--text); }
+    .note { font-size: 0.72rem; color: var(--muted); margin: 0.5rem 0 0; line-height: 1.4; }
   </style>
 </head>
 <body>
 
-<h1>NL SQL Agent — Architecture (current)</h1>
-<p class="lead">
-  HDFC distributor <strong>Individual investor</strong> chat MVP. Natural-language questions become
-  <strong>read-only PostgreSQL</strong> via a modular <strong>schema guide</strong> and a
-  large-context <strong>SQL generator LLM</strong>. Static guards validate SQL before execution;
-  small LLMs handle module routing and validation repair.
-</p>
+<header>
+  <h1>NL SQL Agent — Architecture</h1>
+  <p class="subtitle">
+    Distributor <strong>Individual investor</strong> chat: natural language → modular schema guide →
+    read-only PostgreSQL. Six diagrams below; §6 adds <strong>infrastructure + LLM</strong> cost planning.
+    Full model-mix matrix: <a href="../readme.md#model-mix-comparison-cost-impact-vs-current-defaults">readme.md</a>.
+  </p>
+</header>
 
-<nav class="toc">
-  <strong>Contents:</strong>
-  <a href="#overview">Overview</a>
-  <a href="#e2e">End-to-end turn</a>
-  <a href="#agent-tools">Agent tools diagram</a>
-  <a href="#catalog-sql">Catalog SQL pipeline</a>
-  <a href="#schema-guide">Schema guide modules</a>
-  <a href="#llm-tier">LLM tiers</a>
-  <a href="#cost">Estimated cost</a>
-  <a href="#model-mix">Model mix comparison</a>
-  <a href="#tools">Root tools</a>
-  <a href="#state">Session state</a>
-  <a href="#data">Data &amp; local dev</a>
-  <a href="#security">Security</a>
-  <a href="#legacy">Legacy pipeline</a>
+<nav>
+  <a href="#system">1. System</a>
+  <a href="#request">2. Request path</a>
+  <a href="#catalog-sql">3. Catalog SQL</a>
+  <a href="#schema-guide">4. Schema guide</a>
+  <a href="#data">5. Data layer</a>
+  <a href="#costing">6. Infra &amp; cost</a>
 </nav>
 
 <div class="legend">
-  <span class="guide">■ Schema guide</span>
-  <span class="llm">■ LLM (LiteLLM / Bedrock)</span>
-  <span class="det">■ Deterministic guards</span>
-  <span class="db">■ PostgreSQL</span>
-  <span class="state">■ ADK session.state</span>
-  <span style="border-color:#94a3b8;color:#94a3b8">■ Tool (handler)</span>
+  <span class="guide">Schema guide</span>
+  <span class="llm">LLM (Bedrock / LiteLLM)</span>
+  <span class="det">Deterministic</span>
+  <span>Tool handler</span>
+  <span style="border-color:#f59e0b;color:#f59e0b">PostgreSQL</span>
 </div>
 
-<!-- ========== OVERVIEW ========== -->
-<h2 id="overview">1. Stack overview</h2>
-<div class="diagram">
+<!-- 1. SYSTEM -->
+<section id="system">
+  <h2>1. System context</h2>
+  <div class="diagram">
 <pre class="mermaid">
 flowchart TB
-  UI["Browser / ADK Web UI<br/>127.0.0.1:8000"]
-  API["FastAPI main.py<br/>ADK /run"]
-  ROOT["Root LlmAgent<br/>investor_search_agent<br/>Haiku — picks one tool / turn"]
+  UI["Browser · ADK Web UI<br/>:8000"]
+  API["FastAPI · ADK /run"]
+  ROOT["Root LlmAgent<br/>investor_search_agent · Haiku<br/>3 tools · one per turn"]
 
-  subgraph TOOLS["Registered tools — app/agents/tools.py"]
-    T_GREET["greeting_tool<br/>no inner LLM"]
-    T_DETECT["detect_intent_tool<br/>deterministic router<br/>may call other tools"]
-    T_SQL["generate_catalog_sql_query_tool<br/>catalog SQL pipeline"]
+  subgraph TOOLS["tools.py"]
+    T1["greeting_tool"]
+    T2["detect_intent_tool"]
+    T3["generate_catalog_sql_query_tool"]
   end
 
-  subgraph GUIDE["Schema guide (runtime)"]
-    MAN["manifest.json + 9 modules"]
-    FULL["investor_db_schema_guide.json<br/>audit / build source"]
-    PAT["investor_schema_question_patterns.py"]
-    MAN --> PAYLOAD["Slim JSON payload per question"]
-    PAT --> BUILD["build_schema_guide_modules.py"]
-    FULL --> BUILD
+  subgraph SQL_PIPE["Inside catalog SQL tool"]
+    RTR["Module router · Haiku"]
+    GEN["SQL generator · Sonnet"]
+    G["sql_guard"]
+    EX["catalog_sql_executor"]
   end
 
-  subgraph LLMS["LiteLLM calls inside generate_catalog_sql"]
-    RTR["Module router LLM<br/>Haiku"]
-    GEN["SQL generator LLM<br/>Sonnet / large context"]
-    VAL["Validation repair LLM<br/>Haiku — optional"]
-    EXR["Execute repair<br/>same generator + repair_context"]
-  end
-
-  subgraph GUARD["sql_guard.py — deterministic"]
-    SAN["sanitize_catalog_sql"]
-    NORM["normalize_catalog_sql_parameters"]
-    V1["validate_dynamic_sql"]
-    V2["validate_arn_first_parameter"]
-  end
-
-  EXEC["catalog_sql_executor.py<br/>PostgresClient READ ONLY"]
-  PG[(PostgreSQL<br/>local Docker :5433 or remote dev)]
+  GUIDE["schema_guide_modules<br/>+ question_patterns"]
+  PG[(PostgreSQL<br/>:5433 local or remote)]
 
   UI --> API --> ROOT
-  ROOT --> T_GREET & T_DETECT & T_SQL
-  T_DETECT -.->|delegates| T_GREET
-  T_DETECT -.->|investor path| T_SQL
-  T_SQL --> GEN
-  GEN --> RTR --> PAYLOAD
-  GEN --> SAN --> NORM --> V1 --> V2
-  V1 -.->|fail| VAL
-  V2 --> EXEC --> PG
-  EXEC -.->|DB error| EXR
+  ROOT --> T1 & T2 & T3
+  T2 -.->|investor NL| T3
+  T3 --> RTR --> GUIDE --> GEN --> G --> EX --> PG
+  GEN -.->|validate fail| FIX["Validation repair · Haiku"]
+  EX -.->|DB error| GEN
 
   classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
   classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
   classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
   classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
-  class MAN,PAYLOAD,GUIDE guide
-  class RTR,GEN,VAL,EXR,ROOT llm
-  class SAN,NORM,V1,V2 det
-  class T_GREET,T_DETECT,T_SQL tool
+  class GUIDE guide
+  class ROOT,RTR,GEN,FIX llm
+  class G det
+  class T1,T2,T3 tool
 </pre>
-</div>
-
-<table>
-  <thead><tr><th>Layer</th><th>Role</th><th>Key paths</th></tr></thead>
-  <tbody>
-    <tr>
-      <td>Root agent</td>
-      <td>ADK <code>LlmAgent</code> — exactly <strong>3 tools</strong>; chooses one per turn (Haiku)</td>
-      <td><code>app/agents/investor_search_agent/agent.py</code>, <code>system_prompts.ROOT_AGENT_INSTRUCTION</code></td>
-    </tr>
-    <tr>
-      <td><code>greeting_tool</code></td>
-      <td>Pure hi/thanks → static HDFC greeting; updates session routing</td>
-      <td><code>tools.greeting_tool</code>, <code>routing.classify_message</code></td>
-    </tr>
-    <tr>
-      <td><code>detect_intent_tool</code></td>
-      <td>Optional shim: deterministic classify → greeting, out-of-scope, or <code>generate_catalog_sql_query_tool</code></td>
-      <td><code>tools.detect_intent_tool</code>, <code>routing.py</code>, <code>filter_detection.py</code></td>
-    </tr>
-    <tr>
-      <td><code>generate_catalog_sql_query_tool</code></td>
-      <td>All investor NL → SQL → validate → execute → rows + summary</td>
-      <td><code>tools.generate_catalog_sql_query_tool</code>, <code>query_flow_router.py</code></td>
-    </tr>
-    <tr>
-      <td>Schema guide</td>
-      <td>Tables, join recipes, question patterns, filter vocabulary for the generator</td>
-      <td><code>app/data/schema_guide_modules/</code>, <code>investor_db_schema_guide.json</code></td>
-    </tr>
-    <tr>
-      <td>SQL guards</td>
-      <td>Read-only, LIMIT, ARN-first <code>%s</code>, placeholder count</td>
-      <td><code>app/services/sql_guard.py</code></td>
-    </tr>
-    <tr>
-      <td>Database</td>
-      <td>Parameterized <code>SELECT</code> / <code>WITH</code> only</td>
-      <td><code>app/db/postgres.py</code>, <code>config.database_url_value</code> (local Docker preferred in dev)</td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- ========== E2E ========== -->
-<h2 id="e2e">2. End-to-end turn (current)</h2>
-<p class="lead">
-  One user message → <strong>one root ADK completion</strong> (Haiku) that invokes <strong>exactly one</strong> of the
-  three registered tools. Investor SQL may also be reached via <code>detect_intent_tool</code>, which
-  internally calls <code>generate_catalog_sql_query_tool</code>.
-</p>
-<div class="diagram diagram-e2e">
-<pre class="mermaid">
-%%{init: {
-  "flowchart": { "useMaxWidth": false, "htmlLabels": true, "curve": "basis", "nodeSpacing": 40, "rankSpacing": 50 },
-  "themeVariables": { "fontSize": "13px" }
-}}%%
-flowchart TB
-  U([User message]) --> API["FastAPI get_fast_api_app<br/>POST /run · session.state"]
-  API --> ROOT["Root LlmAgent Haiku<br/>build_root_agent_instruction"]
-
-  ROOT --> PICK{"Root picks tool<br/>(3 registered)"}
-
-  PICK -->|pure greeting| G1["greeting_tool"]
-  PICK -->|optional shim| G2["detect_intent_tool"]
-  PICK -->|investor data direct| G3["generate_catalog_sql_query_tool"]
-
-  G1 --> R1["routing.classify_message<br/>write_session_state"]
-  R1 --> OUT1["reply: HDFC_GREETING_MESSAGE<br/>status greeting"]
-
-  G2 --> R2["classify_message · filter_detection<br/>write_session_state + temp detect keys"]
-  R2 --> D2{"detect_intent branch<br/>deterministic — no LLM"}
-  D2 -->|is_greeting| G1
-  D2 -->|banking terms| OUT2["status out_of_scope<br/>banking reply"]
-  D2 -->|non-individual| OUT3["status out_of_scope<br/>NON_INDIVIDUAL_NOT_SUPPORTED"]
-  D2 -->|else investor NL| G3
-
-  G3 --> ARN{"arn_scope_guard<br/>user text / args vs DEFAULT_DEV_ARN"}
-  ARN -->|blocked| OUT4["status blocked<br/>ARN_SCOPE_REPLY"]
-  ARN -->|ok| PIPE["Catalog SQL pipeline §3"]
-
-  PIPE --> OUT5["status ok + rows table<br/>or error + SQL in state"]
-
-  OUT1 & OUT2 & OUT3 & OUT4 & OUT5 --> U2([User sees reply])
-
-  classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
-  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
-  classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
-  classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
-  classDef state fill:#4a1942,stroke:#f472b6,color:#e7ecf3
-  class ROOT,PIPE llm
-  class G1,G2,G3,R1,R2 tool
-  class D2,ARN det
-  class R2 state
-</pre>
-</div>
-
-<h3>How the root agent chooses a tool</h3>
-<table>
-  <thead><tr><th>Typical user message</th><th>Tool the root should call</th><th>LLM calls inside tool</th><th>Outcome</th></tr></thead>
-  <tbody>
-    <tr><td>Pure greeting / thanks (hi, hello, namaste)</td><td><code>greeting_tool</code></td><td>None (root Haiku only)</td><td>Static greeting text</td></tr>
-    <tr><td>Investor list, filters, analytics, SQL-style ask</td><td><code>generate_catalog_sql_query_tool</code> <em>or</em> <code>detect_intent_tool</code></td><td>2× Haiku + 1× Sonnet (+ optional repairs) — see §3</td><td>Result table + summary; SQL in <code>last_sql</code></td></tr>
-    <tr><td>Banking (balance, transfer, loan, …)</td><td>Root may refuse in prose <em>or</em> call <code>detect_intent_tool</code></td><td>None if detect returns out-of-scope</td><td>Out-of-scope reply; no warehouse SQL</td></tr>
-    <tr><td>Non-individual investors</td><td>Same as banking</td><td>None</td><td><code>NON_INDIVIDUAL_NOT_SUPPORTED</code></td></tr>
-  </tbody>
-</table>
-<p class="lead" style="font-size:0.82rem">
-  <code>detect_intent_tool</code> exists so models that still call “detect intent” from older prompts get the
-  <strong>same catalog SQL path</strong> without exposing removed tools
-  (<code>search_investors_tool</code>, <code>analyze_search_arguments_tool</code>, etc.).
-</p>
-
-<!-- ========== AGENT TOOLS ========== -->
-<h2 id="agent-tools">2b. Agent tools — structure and call graph</h2>
-<div class="callout">
-  <strong>Source of truth:</strong> <code>investor_search_agent/agent.py</code> → <code>_root_tools()</code> returns
-  <code>[greeting_tool, detect_intent_tool, generate_catalog_sql_query_tool]</code> only.
-</div>
-
-<div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  subgraph ADK["Root LlmAgent — investor_search_agent"]
-    direction TB
-    A1["greeting_tool(message)"]
-    A2["detect_intent_tool(message)"]
-    A3["generate_catalog_sql_query_tool(question)"]
-  end
-
-  subgraph DET_IN["Inside detect_intent_tool"]
-    direction TB
-    B1["routing.classify_message"]
-    B2["filter_detection.message_has_search_filters"]
-    B3{"branch"}
-    B4["greeting_tool()"]
-    B5["out-of-scope dict"]
-    B6["generate_catalog_sql_query_tool()"]
-    B1 --> B2 --> B3
-    B3 -->|greeting| B4
-    B3 -->|banking / NI| B5
-    B3 -->|investor| B6
-  end
-
-  subgraph SQL_IN["Inside generate_catalog_sql_query_tool"]
-    direction TB
-    C0["arn_scope_guard"]
-    C1["load_schema_guide"]
-    C2["query_flow_router + module router LLM"]
-    C3["sql_guard + catalog_sql_executor"]
-    C0 --> C1 --> C2 --> C3
-  end
-
-  A2 --> DET_IN
-  A3 --> SQL_IN
-  A2 -.->|investor path| SQL_IN
-
-  classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
-  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
-  class A1,A2,A3,B4,B5 tool
-  class B6,C2,C3 llm
-</pre>
-</div>
-
-<div class="diagram">
-<pre class="mermaid">
-sequenceDiagram
-  participant User
-  participant ADK as FastAPI ADK /run
-  participant Root as Root LlmAgent Haiku
-  participant Greet as greeting_tool
-  participant Detect as detect_intent_tool
-  participant SQL as generate_catalog_sql_query_tool
-  participant PG as PostgreSQL
-
-  User->>ADK: newMessage
-  ADK->>Root: instruction + tools list
-
-  alt Root chooses greeting_tool
-    Root->>Greet: message
-    Greet-->>Root: AgentToolOutput greeting
-  else Root chooses detect_intent_tool
-    Root->>Detect: message
-    alt detect sees greeting
-      Detect->>Greet: delegate
-      Greet-->>Detect: greeting
-    else detect sees banking / NI
-      Detect-->>Root: out_of_scope (no SQL)
-    else detect sees investor question
-      Detect->>SQL: message as question
-      SQL->>PG: read-only query
-      SQL-->>Detect: rows + status
-      Detect-->>Root: SQL result + intent_detection meta
-    end
-  else Root chooses generate_catalog_sql directly
-    Root->>SQL: question
-    SQL->>PG: read-only query
-    SQL-->>Root: rows + status
-  end
-
-  Root-->>User: natural language + tool payload
-</pre>
-</div>
-
-<table>
-  <thead>
-    <tr><th>Tool</th><th>Arguments</th><th>Inner LLM?</th><th>May call</th><th>Response shape</th></tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>greeting_tool</code></td>
-      <td><code>message</code></td>
-      <td>No</td>
-      <td><code>routing.write_session_state</code></td>
-      <td><code>AgentToolOutput</code> — <code>status: greeting</code></td>
-    </tr>
-    <tr>
-      <td><code>detect_intent_tool</code></td>
-      <td><code>message</code></td>
-      <td>No (classify is keyword/heuristic)</td>
-      <td><code>greeting_tool</code> or <code>generate_catalog_sql_query_tool</code> or static out-of-scope</td>
-      <td><code>AgentToolOutput</code> or <code>GenerateCatalogSqlToolOutput</code> (+ optional <code>intent_detection</code>)</td>
-    </tr>
-    <tr>
-      <td><code>generate_catalog_sql_query_tool</code></td>
-      <td><code>question</code> (user NL only)</td>
-      <td>Yes — module router + Sonnet generator (+ repairs)</td>
-      <td><code>schema_guide_modules</code>, <code>sql_guard</code>, <code>catalog_sql_executor</code></td>
-      <td><code>GenerateCatalogSqlToolOutput</code> — <code>rows</code>, <code>reply</code>, <code>sql</code>, <code>executed</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- ========== CATALOG SQL ========== -->
-<h2 id="catalog-sql">3. Catalog SQL pipeline (detail)</h2>
-<div class="callout">
-  <strong>Entry:</strong> <code>generate_catalog_sql_query_tool(question)</code> in
-  <code>app/agents/tools.py</code>. Orchestrates generation in
-  <code>app/services/query_flow_router.py</code>, guards in <code>sql_guard.py</code>, execution in
-  <code>catalog_sql_executor.py</code>.
-</div>
-
-<div class="diagram">
-<pre class="mermaid">
-sequenceDiagram
-  participant Tool as generate_catalog_sql_query_tool
-  participant Router as query_flow_router
-  participant ModR as schema_guide_module_router
-  participant Gen as SQL generator LLM
-  participant Guard as sql_guard
-  participant ValFix as validation_repair LLM
-  participant Exec as catalog_sql_executor
-  participant DB as PostgreSQL
-  participant ST as session.state
-
-  Tool->>Router: run_catalog_sql_generator_llm(question, session_arn)
-  Router->>ModR: select module ids (Haiku or keywords)
-  ModR-->>Router: core_arn_investor + activity_transactions, …
-  Router->>Gen: modular guide JSON + question
-  Gen-->>Router: { thought, sql, parameters }
-  Router->>Guard: sanitize + normalize parameters
-  Tool->>Guard: validate_dynamic_sql + validate_arn_first_parameter
-  alt validation fails
-    Tool->>ValFix: validation_error + failed_sql
-    ValFix-->>Tool: corrected JSON
-    Tool->>Guard: re-validate
-  end
-  Tool->>ST: final_query, last_sql, query_flow_trace
-  Tool->>Exec: execute_catalog_sql_readonly
-  Exec->>DB: cur.execute(%s params)
-  alt Postgres error
-    Tool->>Router: repair_context (failed_sql, database_error)
-    Router->>Gen: repair pass
-    Tool->>Exec: retry once
-  end
-  DB-->>Tool: rows
-  Tool-->>Tool: reply + rows[] for UI table
-</pre>
-</div>
-
-<h3>Deterministic hygiene (before / after LLM)</h3>
-<table>
-  <thead><tr><th>Step</th><th>Function</th><th>What it fixes</th></tr></thead>
-  <tbody>
-    <tr>
-      <td>Sanitize SQL</td>
-      <td><code>sanitize_catalog_sql</code></td>
-      <td>Stray <code>);</code> before <code>SELECT</code>; trailing <code>;</code>; HTML entities e.g. <code>&amp;lt;</code> → <code>&lt;</code></td>
-    </tr>
-    <tr>
-      <td>Normalize parameters</td>
-      <td><code>normalize_catalog_sql_parameters</code></td>
-      <td><code>session_arn</code> first; preserve duplicate ARNs (CTE + outer); coerce <code>5000</code> → int</td>
-    </tr>
-    <tr>
-      <td>Validate SQL</td>
-      <td><code>validate_dynamic_sql</code></td>
-      <td>Single <code>SELECT</code>/<code>WITH</code>; no DML; <code>LIMIT</code> ≤ 500; no interior <code>;</code></td>
-    </tr>
-    <tr>
-      <td>Validate binds</td>
-      <td><code>validate_arn_first_parameter</code></td>
-      <td>First <code>%s</code> on <code>arn_code</code>/<code>brok_code</code>; placeholder count; requires <code>%s</code> (no inlined ARN)</td>
-    </tr>
-    <tr>
-      <td>Execute</td>
-      <td><code>postgres.py</code></td>
-      <td>Escape literal <code>%</code> in <code>LIKE</code> patterns for psycopg pyformat</td>
-    </tr>
-  </tbody>
-</table>
-
-<h3>LLM repair paths (when guards or DB fail)</h3>
-<table>
-  <thead><tr><th>Trigger</th><th>Model tier</th><th>Service</th><th>Retries</th></tr></thead>
-  <tbody>
-    <tr>
-      <td>Static validation error</td>
-      <td>Small (Haiku default)</td>
-      <td><code>catalog_sql_validation_repair.py</code></td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <td>PostgreSQL execution error</td>
-      <td>Large (Sonnet generator)</td>
-      <td><code>query_flow_router</code> with <code>repair_context</code></td>
-      <td><code>CATALOG_SQL_MAX_RETRIES_ON_EXECUTE_ERROR</code> (default 1)</td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- ========== SCHEMA GUIDE ========== -->
-<h2 id="schema-guide">4. Schema guide &amp; modular payload</h2>
-<div class="callout">
-  <strong>Build modules:</strong> <code>python scripts/build_schema_guide_modules.py</code> from
-  <code>investor_db_schema_guide.json</code> + <code>investor_schema_question_patterns.py</code>.
-  <strong>Patterns</strong> include redemption+equity, active SIP+hybrid, dormant, top purchases FY25, etc.
-</div>
-
-<div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  Q["User question"] --> SEL["select_module_ids_for_question"]
-  SEL -->|LLM| H["schema_guide_module_router<br/>Haiku"]
-  SEL -->|fallback| K["keyword + phrase_patterns<br/>from manifest.json"]
-  H --> IDS["e.g. core_arn_investor,<br/>activity_transactions,<br/>holdings_schemes"]
-  K --> IDS
-  IDS --> LOAD["load_module × N"]
-  LOAD --> ASM["assemble payload<br/>tables, join_recipes,<br/>question_patterns, filter_vocabulary"]
-  ASM --> GEN["SQL generator LLM prompt"]
-
-  classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
-  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
-  class ASM,LOAD,IDS guide
-  class H,GEN llm
-</pre>
-</div>
-
-<table>
-  <thead><tr><th>Module id</th><th>Typical NL topics</th></tr></thead>
-  <tbody>
-    <tr><td><code>core_arn_investor</code></td><td>Always included — <code>distributor_investor_mapping</code>, <code>investor</code>, ARN scope</td></tr>
-    <tr><td><code>activity_transactions</code></td><td>Redemptions, purchases, FY25, last quarter — <code>processed_trxns</code>, <code>trxn_date</code></td></tr>
-    <tr><td><code>sip_systematic</code></td><td>Active SIP amount, hybrid — <code>sipstp</code></td></tr>
-    <tr><td><code>holdings_schemes</code></td><td>Equity / liquid / scheme_type — <code>scheme_master</code>, <code>scheme_setup</code></td></tr>
-    <tr><td><code>dormant_holdings</code></td><td>Inactive, zero units — <code>customer_schemes.l_trxn_date</code></td></tr>
-    <tr><td><code>geography_city</code></td><td>Mumbai, multi-city name search — <code>customer_master</code></td></tr>
-    <tr><td><code>investor_filters</code></td><td>Age range — <code>investor.dob</code></td></tr>
-    <tr><td><code>tax_profile</code></td><td>NRI, minor, CGF — <code>tax_status</code></td></tr>
-  </tbody>
-</table>
-
-<p class="lead" style="font-size:0.82rem">
-  <strong>Column discipline:</strong> <code>processed_trxns</code> uses <code>trxn_date</code> (not
-  <code>l_trxn_date</code>). Equity uses <code>scheme_master.scheme_type</code> and/or
-  <code>scheme_setup.asset_class</code> — not <code>scheme_master.asset_class</code>.
-</p>
-
-<!-- ========== LLM TIER ========== -->
-<h2 id="llm-tier">5. LLM model tiers (Bedrock defaults)</h2>
-<table>
-  <thead><tr><th>Phase</th><th>When it runs</th><th>Config</th><th>Default model</th></tr></thead>
-  <tbody>
-    <tr><td>Root ADK agent</td><td>Every chat turn (tool choice + reply)</td><td><code>BEDROCK_MODEL_ID</code> / <code>BEDROCK_ROOT_MODEL_ID</code></td><td>Claude 3 Haiku</td></tr>
-    <tr><td>Module router</td><td>Each <code>generate_catalog_sql_query_tool</code> (unless keyword-only)</td><td><code>BEDROCK_MODULE_ROUTER_MODEL_ID</code>, <code>QUERY_GENERATOR_MODULE_ROUTER_LLM</code></td><td>Haiku</td></tr>
-    <tr><td>SQL generator</td><td>Each catalog SQL generation (+ optional execute repair)</td><td><code>BEDROCK_QUERY_GENERATOR_MODEL_ID</code></td><td>Claude 3.5 Sonnet</td></tr>
-    <tr><td>Validation repair</td><td>When <code>sql_guard</code> fails (max 1×)</td><td><code>CATALOG_SQL_VALIDATION_REPAIR_*</code></td><td>Haiku</td></tr>
-  </tbody>
-</table>
-
-<h2 id="cost">6. Estimated cost per turn (planning)</h2>
-<p class="lead">
-  Approximate <strong>on-demand</strong> Bedrock token pricing for capacity planning—not invoices.
-  Confirm current $/1M rates for your region and model IDs in the
-  <a href="https://aws.amazon.com/bedrock/pricing/" style="color:var(--llm)">AWS Bedrock pricing</a> page.
-</p>
-
-<table>
-  <thead>
-    <tr><th>User action</th><th>LLM calls (typical)</th><th>Est. tokens (input → output)</th><th>Est. $ / turn</th></tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Greeting / thanks</td>
-      <td>1× Haiku (root only)</td>
-      <td>~3k → ~0.4k</td>
-      <td><strong>~$0.001</strong></td>
-    </tr>
-    <tr>
-      <td>Investor question — happy path</td>
-      <td>1× Haiku root + 1× Haiku router + 1× Sonnet SQL gen</td>
-      <td>~3k→0.5k + ~2.5k→0.3k + ~14k→2k</td>
-      <td><strong>~$0.08–0.10</strong></td>
-    </tr>
-    <tr>
-      <td>+ validation repair</td>
-      <td>+1× Haiku (<code>catalog_sql_validation_repair</code>)</td>
-      <td>+~3k → ~1k</td>
-      <td>+$0.002</td>
-    </tr>
-    <tr>
-      <td>+ execute repair</td>
-      <td>+1× Sonnet (generator + <code>repair_context</code>)</td>
-      <td>+~14k → ~2k</td>
-      <td>+$0.07–0.09</td>
-    </tr>
-    <tr>
-      <td>Worst case (both repairs)</td>
-      <td>2× Haiku + 2× Sonnet + root</td>
-      <td>—</td>
-      <td><strong>~$0.17–0.20</strong></td>
-    </tr>
-  </tbody>
-</table>
-
-<p class="lead" style="font-size:0.82rem">
-  <strong>Baseline rates used above:</strong> Haiku ~$0.25 / $1.25 per 1M input/output tokens;
-  Sonnet 3.5 ~$3 / $15 per 1M. The <strong>Sonnet SQL generator</strong> dominates happy-path cost
-  (~80%) because the modular guide payload is large (up to <code>QUERY_GENERATOR_MODULAR_GUIDE_MAX_CHARS</code>).
-</p>
-
-<h3>Volume scaling (investor SQL, happy path)</h3>
-<p class="lead" style="font-size:0.82rem;margin-top:0.5rem">
-  LLM spend only — one happy-path investor question per row. DB / infra excluded.
-</p>
-<table>
-  <thead>
-    <tr><th>Requests</th><th>Happy path ($0.08 – $0.10)</th><th>Mid (~$0.09)</th><th>Worst case ($0.17 – $0.20)</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><strong>100</strong></td><td>$8 – $10</td><td><strong>~$9</strong></td><td>$17 – $20</td></tr>
-    <tr><td><strong>1,000</strong></td><td>$80 – $100</td><td><strong>~$90</strong></td><td>$170 – $200</td></tr>
-    <tr><td><strong>10,000</strong></td><td>$800 – $1,000</td><td><strong>~$900</strong></td><td>$1,700 – $2,000</td></tr>
-    <tr><td><strong>1,000,000</strong></td><td>$80,000 – $100,000</td><td><strong>~$90,000</strong></td><td>$170,000 – $200,000</td></tr>
-  </tbody>
-</table>
-
-<table>
-  <thead><tr><th>vs legacy SearchPlan pipeline (removed from root agent)</th><th>Old</th><th>Current</th></tr></thead>
-  <tbody>
-    <tr><td>LLM calls per investor question</td><td>~2× Haiku (intent + search plan) + root</td><td>~2× Haiku + 1× Sonnet (+ optional repairs)</td></tr>
-    <tr><td>Who writes SQL</td><td>Deterministic <code>filter_dp_investor_menu</code></td><td>LLM + <code>sql_guard</code></td></tr>
-    <tr><td>Typical $ / question (planning)</td><td>~$0.02–0.05 (no Sonnet)</td><td>~$0.08–0.10 (Sonnet-heavy)</td></tr>
-    <tr><td>Prompt size control</td><td>Full <code>filter_catalog.json</code> could be very large</td><td>Modular guide capped per question</td></tr>
-  </tbody>
-</table>
-
-<h3 id="model-mix">Model mix comparison (vs current defaults)</h3>
-<p class="lead" style="font-size:0.82rem;margin-top:0.5rem">
-  Same happy-path token assumptions as above. Changing the <strong>SQL generator</strong> model moves cost most;
-  changing only router/repair saves ~10–15% at most.
-</p>
-<table>
-  <thead>
-    <tr>
-      <th>Config</th><th>Root</th><th>Router</th><th>SQL gen</th><th>$/req</th><th>vs ~$0.09</th>
-      <th>1K</th><th>10K</th><th>1M</th><th>Notes</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>A Current</strong></td>
-      <td>Haiku 3</td><td>Haiku 3</td><td><strong>Sonnet 3.5</strong></td>
-      <td>$0.08–0.10</td><td>baseline</td>
-      <td>~$90</td><td>~$900</td><td>~$90k</td>
-      <td>Default <code>.env</code></td>
-    </tr>
-    <tr>
-      <td>B Keyword router</td>
-      <td>Haiku 3</td><td>—</td><td>Sonnet 3.5</td>
-      <td>~$0.08</td><td>−5–10%</td>
-      <td>~$80</td><td>~$800</td><td>~$80k</td>
-      <td><code>QUERY_GENERATOR_MODULE_ROUTER_LLM=false</code></td>
-    </tr>
-    <tr>
-      <td>C Nova Micro steps</td>
-      <td>Haiku 3</td><td>Nova Micro</td><td>Sonnet 3.5</td>
-      <td>~$0.08</td><td>−10–15%</td>
-      <td>~$75</td><td>~$750</td><td>~$75k</td>
-      <td>Cheap router + repair only</td>
-    </tr>
-    <tr>
-      <td>E Nova Pro SQL</td>
-      <td>Haiku 3</td><td>Haiku 3</td><td><strong>Nova Pro</strong></td>
-      <td>~$0.02–0.03</td><td>−70–75%</td>
-      <td>~$25</td><td>~$250</td><td>~$25k</td>
-      <td>Test SQL quality before rollout</td>
-    </tr>
-    <tr>
-      <td>F Haiku SQL</td>
-      <td>Haiku 3</td><td>Haiku 3</td><td><strong>Haiku 3.5</strong></td>
-      <td>~$0.02–0.03</td><td>−70–75%</td>
-      <td>~$25</td><td>~$250</td><td>~$25k</td>
-      <td>More validation/repair churn</td>
-    </tr>
-    <tr>
-      <td>H All Nova Lite</td>
-      <td>Nova Lite</td><td>Nova Lite</td><td>Nova Lite</td>
-      <td>~$0.002</td><td>−95–98%</td>
-      <td>~$2</td><td>~$20</td><td>~$2k</td>
-      <td>Lab / spike only — not prod</td>
-    </tr>
-  </tbody>
-</table>
-<p class="lead" style="font-size:0.82rem">
-  Full matrix (configs G–I, rate card, env vars): <code>readme.md</code> § Model mix comparison.
-</p>
-
-<p class="lead" style="font-size:0.82rem">
-  <strong>Cost levers:</strong> <code>QUERY_GENERATOR_MODULE_ROUTER_LLM=false</code> (keyword module pick);
-  lower <code>QUERY_GENERATOR_MODULAR_GUIDE_MAX_CHARS</code>; Nova Lite/Micro for router + validation repair;
-  <code>CATALOG_SQL_VALIDATION_REPAIR_ENABLED=false</code> only if you accept more validation errors in chat.
-</p>
-
-<!-- ========== TOOLS ========== -->
-<h2 id="tools">7. Root agent tools — quick reference</h2>
-<p class="lead">Same three tools as §2b; this table is the at-a-glance index.</p>
-<table>
-  <thead><tr><th>Tool</th><th>When root calls it</th><th>Postgres?</th><th>Key session keys</th></tr></thead>
-  <tbody>
-    <tr>
-      <td><code>greeting_tool</code></td>
-      <td>Social greeting only</td>
-      <td>No</td>
-      <td><code>routing_state</code>, <code>current_intent</code>, <code>step</code></td>
-    </tr>
-    <tr>
-      <td><code>detect_intent_tool</code></td>
-      <td>Legacy “detect first” pattern; routes inside</td>
-      <td>Only if it delegates to catalog SQL tool</td>
-      <td>Above + <code>has_search_filters</code>, <code>temp:should_call_tool</code></td>
-    </tr>
-    <tr>
-      <td><code>generate_catalog_sql_query_tool</code></td>
-      <td>All investor NL (preferred direct call)</td>
-      <td>Yes (read-only)</td>
-      <td><code>final_query</code>, <code>last_sql</code>, <code>catalog_query_generator_last</code>, <code>query_flow_trace</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p class="lead" style="font-size:0.82rem">
-  <strong>Not registered on root agent</strong> (removed / legacy only in code or docs):
-  <code>search_investors_tool</code>, <code>analyze_search_arguments_tool</code>,
-  <code>detect_intent</code> LLM service, <code>search_plan_builder</code>.
-  Prompts: <code>system_prompts.py</code> (root, module router, SQL generator, validation repair);
-  root instruction also merges <code>filter_prompts.build_root_agent_instruction()</code>.
-</p>
-
-<!-- ========== STATE ========== -->
-<h2 id="state">8. Session state</h2>
-<div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  subgraph ALL["Any tool may update"]
-    RS["routing_state · route · step<br/>current_intent · last_user_message"]
-  end
-  subgraph GREET["greeting_tool"]
-    G1["routing_state = greeting"]
-  end
-  subgraph DETECT["detect_intent_tool"]
-    D1["has_search_filters<br/>temp:detected_intent · temp:should_call_tool"]
-  end
-  subgraph SQL["generate_catalog_sql_query_tool"]
-    S1["final_query · last_sql · last_sql_parameters"]
-    S2["catalog_query_generator_last<br/>query_flow_trace[]"]
-  end
-  ALL --> GREET & DETECT & SQL
-</pre>
-</div>
-
-<!-- ========== DATA ========== -->
-<h2 id="data">9. Data layer &amp; local development</h2>
-<div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  subgraph REMOTE["Remote dev (VPN)"]
-    DEV[(Dev PostgreSQL)]
-  end
-  subgraph LOCAL["Local Docker — default for APP_ENV=local"]
-    CLONE["clone_dev_db_docker.sh<br/>--subset · --accessible"]
-    DOCKER["Postgres :5433<br/>pgAdmin :5050"]
-    CLONE --> DOCKER
-  end
-  DEV --> CLONE
-  DOCKER --> APP["config.database_url_value<br/>USE_LOCAL_DOCKER_POSTGRES=true"]
-  DEV -.->|optional direct| APP
-
-  subgraph AUX["Auxiliary — not full warehouse mirror"]
-    SQLITE["filter_catalog_local.sqlite<br/>sync_filter_catalog_sqlite.py"]
-    GUIDEJSON["investor_db_schema_guide.json"]
-  end
-  SQLITE -.->|catalog merge only| FC["filter_catalog.json"]
-</pre>
-</div>
-
-<p class="lead" style="font-size:0.82rem">
-  Subset clone (~14 contract tables) is enough for ARN-scoped chat but may return few rows for heavy
-  analytics (e.g. FY25 top-20) until <code>--accessible</code> or remote DB is used. See
-  <code>backend/docs/local_docker_postgres.md</code>.
-</p>
-
-<!-- ========== SECURITY ========== -->
-<h2 id="security">10. Security &amp; product rules</h2>
-<ul style="font-size:0.85rem;color:var(--muted)">
-  <li><strong>ARN scope:</strong> <code>DEFAULT_DEV_ARN</code> / session — first <code>%s</code> bind; not parsed from user free text (<code>arn_scope_guard</code>).</li>
-  <li><strong>Read-only SQL:</strong> Guards block DML/DDL; executor uses read-only connection settings.</li>
-  <li><strong>LLM writes SQL</strong> in the catalog path (constrained by guide + guards + repair), unlike the legacy SearchPlan → fixed function path.</li>
-  <li><strong>User-facing:</strong> Success shows result table + short summary; full SQL in session state (<code>last_sql</code>), not repeated in chat unless execution failed.</li>
-  <li><strong>Non-individual</strong> and banking requests are refused without warehouse access.</li>
-</ul>
-
-<!-- ========== LEGACY ========== -->
-<details class="legacy" id="legacy">
-  <summary>Appendix — Legacy SearchPlan / filter_dp_investor_menu pipeline (not used by root agent)</summary>
-  <p class="lead" style="margin-top:0.75rem">
-    Earlier MVP: <code>detect_intent</code> → <code>analyze_search_arguments</code> →
-    <code>search_investors</code>. LLM produced <strong>SearchPlan JSON</strong> validated against
-    <code>filter_catalog.json</code>; deterministic code called
-    <code>filter_dp_investor_menu(...)</code> — LLM did not write SQL. Much of that code remains under
-    <code>search_plan_builder</code>, <code>individual_executor</code>, etc., but is
-    <strong>not registered</strong> on <code>root_agent</code> today.
+  </div>
+  <p class="caption">
+    Entry: <code>backend/app/agents/investor_search_agent/agent.py</code> ·
+    Prompts: <code>system_prompts.py</code>, <code>filter_prompts.build_root_agent_instruction()</code>
   </p>
+</section>
+
+<!-- 2. REQUEST -->
+<section id="request">
+  <h2>2. Request path (one user message)</h2>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  U([User message]) --> API["POST /run · session.state"]
+  API --> ROOT["Root Haiku picks 1 tool"]
+
+  ROOT --> P{"Which tool?"}
+
+  P -->|hi / thanks| G["greeting_tool"]
+  G --> OG["Static greeting"]
+
+  P -->|optional| D["detect_intent_tool"]
+  D --> DC{"classify_message"}
+  DC -->|greeting| G
+  DC -->|banking / non-individual| OO["out_of_scope · no SQL"]
+  DC -->|investor data| SQL
+
+  P -->|investor NL| SQL["generate_catalog_sql_query_tool"]
+
+  SQL --> ARN{"arn_scope_guard"}
+  ARN -->|blocked| OB["blocked reply"]
+  ARN -->|ok| CS["Catalog SQL pipeline §3"]
+  CS --> OK["rows table + summary<br/>last_sql in state"]
+
+  OG & OO & OB & OK --> U2([User])
+
+  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
+  classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
+  classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
+  class ROOT,CS llm
+  class DC,ARN det
+  class G,D,SQL tool
+</pre>
+  </div>
+  <p class="caption">
+    <code>detect_intent_tool</code> is a shim for older prompts — same SQL path as calling
+    <code>generate_catalog_sql_query_tool</code> directly. Removed from root:
+    <code>search_investors_tool</code>, <code>analyze_search_arguments_tool</code>.
+  </p>
+</section>
+
+<!-- 3. CATALOG SQL -->
+<section id="catalog-sql">
+  <h2>3. Catalog SQL pipeline</h2>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant T as generate_catalog_sql_query_tool
+  participant R as query_flow_router
+  participant M as module_router Haiku
+  participant G as SQL generator Sonnet
+  participant S as sql_guard
+  participant V as validation_repair Haiku
+  participant E as catalog_sql_executor
+  participant DB as PostgreSQL
+
+  T->>R: question + session_arn
+  R->>M: select module ids
+  M-->>R: core_arn_investor + …
+  R->>G: slim guide JSON + question
+  G-->>R: sql + parameters
+  R->>S: sanitize · normalize
+  T->>S: validate read-only · ARN-first %s
+  alt guard fails
+    T->>V: failed_sql + error
+    V-->>T: corrected sql
+    T->>S: re-validate
+  end
+  T->>E: execute_catalog_sql_readonly
+  E->>DB: parameterized SELECT
+  alt Postgres error
+    T->>G: repair_context
+    G-->>T: fixed sql
+    T->>E: retry once
+  end
+  DB-->>T: rows · dedupe by uuid
+  Note over T: session: final_query, last_sql, query_flow_trace
+</pre>
+  </div>
+  <p class="caption">
+    Guards: read-only, LIMIT ≤ 500, ARN first bind, no split name filters (normalized
+    <code>concat_ws</code> + strip spaces), <code>DISTINCT ON (i.uuid)</code> for investor lists.
+    Files: <code>tools.py</code>, <code>query_flow_router.py</code>, <code>sql_guard.py</code>,
+    <code>catalog_sql_executor.py</code>.
+  </p>
+</section>
+
+<!-- 4. SCHEMA GUIDE -->
+<section id="schema-guide">
+  <h2>4. Schema guide (modular prompt)</h2>
   <div class="diagram">
 <pre class="mermaid">
 flowchart LR
-  NL["Natural language"] --> SP["SearchPlan LLM"]
-  SP --> CAT[("filter_catalog.json")]
-  SP --> QA["query_arguments"]
-  QA --> FN["filter_dp_investor_menu()"]
-  FN --> PG[(PostgreSQL)]
+  Q["User question"] --> SEL["select modules"]
+  SEL --> H["Haiku router"]
+  SEL --> K["keyword fallback<br/>manifest.json"]
+  H --> IDS["1–3 modules + core_arn_investor"]
+  K --> IDS
+  IDS --> L["load JSON modules"]
+  L --> P["Payload: tables · join_recipes<br/>question_patterns · filter_vocabulary"]
+  P --> G["Sonnet writes SQL"]
+
   classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
-  class CAT guide
+  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
+  class L,P,IDS guide
+  class H,G llm
 </pre>
   </div>
-  <p class="lead" style="font-size:0.82rem">
-    <code>filter_catalog.json</code> is still built via <code>scripts/refresh_filter_catalog.py</code>
-    for contract-aligned filter values and optional SQLite mirror; the
-    <strong>primary</strong> NL→SQL path is schema-guide + catalog SQL generator.
+  <p class="caption">
+    Build: <code>python scripts/build_schema_guide_modules.py</code> ·
+    Patterns: <code>investor_schema_question_patterns.py</code> ·
+    Modules: <code>core_arn_investor</code>, <code>activity_transactions</code>,
+    <code>sip_systematic</code>, <code>holdings_schemes</code>, <code>geography_city</code>,
+    <code>investor_filters</code>, <code>tax_profile</code>, <code>dormant_holdings</code>, … ·
+    Use <code>pt.trxn_date</code> on <code>processed_trxns</code> (not <code>l_trxn_date</code>).
+  </p>
+</section>
+
+<!-- 5. DATA -->
+<section id="data">
+  <h2>5. Data layer &amp; local dev</h2>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  REMOTE[(Remote dev Postgres<br/>VPN · DEV_DATABASE_URL)]
+  CLONE["clone_dev_db_docker.sh<br/>--subset or --accessible"]
+  LOCAL[(Docker Postgres :5433<br/>investor_db_local)]
+  APP["App SQL execution<br/>USE_LOCAL_DOCKER_POSTGRES=true"]
+
+  REMOTE --> CLONE --> LOCAL --> APP
+  REMOTE -.->|optional direct| APP
+
+  SQLITE[("filter_catalog_local.sqlite<br/>catalog merge only")]
+  SQLITE -.-> FC["filter_catalog.json"]
+
+  classDef db fill:#422006,stroke:#f59e0b,color:#fef3c7
+  class REMOTE,LOCAL db
+</pre>
+  </div>
+  <p class="caption">
+    Subset clone (~14 tables) is enough for ARN-scoped chat; sparse <code>processed_trxns</code> on some
+    folios is expected. Docs: <code>backend/docs/local_docker_postgres.md</code>.
+    Security: ARN from session/config only · read-only SQL · banking / non-individual blocked.
+  </p>
+</section>
+
+<!-- 6. COSTING -->
+<section id="costing">
+  <h2>6. Infrastructure &amp; cost (planning)</h2>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph REQ["Per investor question — variable"]
+    BR["Amazon Bedrock<br/>~80% of $ · Sonnet SQL gen"]
+    BR2["Haiku · root + router + repair"]
+  end
+
+  subgraph FIX["Fixed / monthly infrastructure"]
+    APP["App runtime<br/>FastAPI + ADK · uvicorn"]
+    PG["PostgreSQL<br/>warehouse read-only"]
+    NET["Network · VPN to dev DB"]
+    DEV["Local dev · Docker :5433 · Colima"]
+  end
+
+  U["User"] --> APP
+  APP --> BR & BR2
+  APP --> PG
+  APP -.-> NET
+  DEV -.->|local only| PG
+
+  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
+  classDef infra fill:#422006,stroke:#f59e0b,color:#fef3c7
+  classDef dev fill:#1e293b,stroke:#64748b,color:#cbd5e1
+  class BR,BR2 llm
+  class APP,PG,NET infra
+  class DEV dev
+</pre>
+  </div>
+  <p class="caption">
+    Bedrock is <strong>usage-based</strong> (dominant at scale). App and DB are often <strong>shared
+    existing</strong> capacity — marginal cost can be near zero for an MVP on a shared warehouse.
+    Confirm live rates: <a href="https://aws.amazon.com/bedrock/pricing/">Bedrock pricing</a>.
+  </p>
+
+  <div class="cost-panel">
+    <h3>Per request — cost stack (default models)</h3>
+    <table class="cost">
+      <thead>
+        <tr><th>Layer</th><th>Component</th><th>Typical charge</th><th>Est. $ / request</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>LLM</td><td>Root Haiku (tool choice + reply)</td><td>On-demand tokens</td><td class="num">~$0.001</td></tr>
+        <tr><td>LLM</td><td>Module router Haiku</td><td>On-demand tokens</td><td class="num">~$0.001</td></tr>
+        <tr><td>LLM</td><td>SQL generator Sonnet 3.5</td><td>~14k in → ~2k out</td><td class="num">~$0.07–0.08</td></tr>
+        <tr><td>LLM</td><td>Validation / execute repair (optional)</td><td>+Haiku / +Sonnet</td><td class="num">+$0.00–0.09</td></tr>
+        <tr><td>Compute</td><td>FastAPI worker (shared host)</td><td>Amortized CPU/RAM</td><td class="num">~$0.0001</td></tr>
+        <tr><td>Database</td><td>PostgreSQL read query</td><td>Shared warehouse / pool</td><td class="num">~$0</td></tr>
+        <tr><td>Network</td><td>VPN / private link to DB</td><td>Usually existing</td><td class="num">~$0</td></tr>
+        <tr class="total"><td colspan="3"><strong>Investor SQL — happy path total</strong></td><td class="num"><strong>~$0.08–0.10</strong></td></tr>
+        <tr><td colspan="3">Greeting only (root Haiku)</td><td class="num">~$0.001</td></tr>
+        <tr><td colspan="3">Worst case (both repairs)</td><td class="num">~$0.17–0.20</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Monthly infrastructure — by environment (excludes Bedrock variable above)</h3>
+    <table class="cost">
+      <thead>
+        <tr><th>Environment</th><th>App compute</th><th>PostgreSQL</th><th>Other</th><th>Est. fixed $ / month</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Local dev</strong></td>
+          <td>Laptop · <code>uvicorn</code> / <code>adk web</code></td>
+          <td>Docker Postgres :5433 (subset clone)</td>
+          <td>Colima/Docker Desktop · pgAdmin</td>
+          <td class="num"><strong>$0</strong> (+ Bedrock API usage)</td>
+        </tr>
+        <tr>
+          <td><strong>Shared dev / QA</strong></td>
+          <td>1 small VM or shared K8s pod</td>
+          <td>Existing dev warehouse (VPN)</td>
+          <td>Logs, secrets</td>
+          <td class="num"><strong>$0–80</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Production (single region)</strong></td>
+          <td>2× small containers / EC2 (~1 vCPU each)</td>
+          <td>Read-only to prod warehouse (no new RDS)</td>
+          <td>ALB, CloudWatch, IAM</td>
+          <td class="num"><strong>$80–250</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Production (HA)</strong></td>
+          <td>Auto-scale 2–6 tasks behind LB</td>
+          <td>Pooler + read replica or dedicated RO endpoint</td>
+          <td>Monitoring, WAF (optional)</td>
+          <td class="num"><strong>$200–600</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Total monthly estimate — LLM + infra (investor questions only)</h3>
+    <table class="cost">
+      <thead>
+        <tr>
+          <th>Volume / month</th>
+          <th>LLM (mid ~$0.09 / q)</th>
+          <th>Infra (prod single-region)</th>
+          <th>Combined (planning)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>100 questions</td><td class="num">~$9</td><td class="num">~$100</td><td class="num"><strong>~$110</strong></td></tr>
+        <tr><td>1,000</td><td class="num">~$90</td><td class="num">~$100</td><td class="num"><strong>~$190</strong></td></tr>
+        <tr><td>10,000</td><td class="num">~$900</td><td class="num">~$150</td><td class="num"><strong>~$1,050</strong></td></tr>
+        <tr><td>100,000</td><td class="num">~$9,000</td><td class="num">~$300</td><td class="num"><strong>~$9,300</strong></td></tr>
+        <tr><td>1,000,000</td><td class="num">~$90,000</td><td class="num">~$500</td><td class="num"><strong>~$90,500</strong></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Cost levers (architecture)</h3>
+    <table class="cost">
+      <thead><tr><th>Lever</th><th>Effect</th><th>Trade-off</th></tr></thead>
+      <tbody>
+        <tr><td><code>BEDROCK_QUERY_GENERATOR_MODEL_ID</code> → Nova Pro / Haiku</td><td>LLM −70–75%</td><td>SQL quality — test before prod</td></tr>
+        <tr><td><code>QUERY_GENERATOR_MODULE_ROUTER_LLM=false</code></td><td>LLM −5–10%</td><td>Keyword module routing only</td></tr>
+        <tr><td>Lower <code>QUERY_GENERATOR_MODULAR_GUIDE_MAX_CHARS</code></td><td>LLM −5–15%</td><td>May miss join hints</td></tr>
+        <tr><td>Shared warehouse vs new RDS clone</td><td>Infra −$50–500/mo</td><td>Depends on DBA / network policy</td></tr>
+        <tr><td>Local Docker subset clone</td><td>Dev infra $0</td><td>Sparse facts (e.g. redemptions) on some folios</td></tr>
+      </tbody>
+    </table>
+
+    <p class="note">
+      Infra rows are <strong>order-of-magnitude</strong> for capacity planning (ap-south-1–style single
+      app deployment), not invoices. At low volume, <strong>fixed infra</strong> can exceed LLM; above
+      ~2k investor questions/month, <strong>Bedrock dominates</strong>. Legacy SearchPlan path was
+      ~$0.02–0.05/question (Haiku-only, no Sonnet) — see appendix.
+    </p>
+  </div>
+</section>
+
+<details>
+  <summary>Appendix — Legacy SearchPlan path (not on root agent)</summary>
+  <div class="diagram" style="margin-top:0.75rem">
+<pre class="mermaid">
+flowchart LR
+  NL["Natural language"] --> SP["SearchPlan LLM"]
+  SP --> FN["filter_dp_investor_menu()"]
+  FN --> PG[(PostgreSQL)]
+  classDef legacy fill:#1e293b,stroke:#64748b,color:#cbd5e1
+  class NL,SP,FN legacy
+</pre>
+  </div>
+  <p class="caption">
+    Legacy code remains under <code>individual_executor</code>, <code>search_plan_builder</code>, etc.
+    Production path is schema-guide + catalog SQL (diagrams above).
   </p>
 </details>
 
 <footer>
-  Open in a browser with network for Mermaid CDN. Updated for catalog SQL + modular schema guide flow.
-  Path: <code>planning/architecture.html</code>
+  Requires network for Mermaid CDN. Source: <code>planning/architecture.html</code>
 </footer>
 
 <script>
-  const E2E_DIAGRAM_SCALE = 1.35;
-
   mermaid.initialize({
     startOnLoad: true,
     theme: "dark",
-    flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: true },
-    sequence: { mirrorActors: false, actorFontSize: 14, noteFontSize: 13, messageFontSize: 13 },
+    flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: true, padding: 12 },
+    sequence: { mirrorActors: false, messageFontSize: 12, actorFontSize: 12 },
     themeVariables: {
-      fontSize: "14px",
+      fontSize: "13px",
       primaryColor: "#1e3a5f",
       primaryTextColor: "#e7ecf3",
       primaryBorderColor: "#3b82f6",
@@ -900,29 +523,6 @@ flowchart LR
       tertiaryColor: "#0b0f14"
     }
   });
-
-  function scaleE2eDiagram() {
-    const wrap = document.querySelector(".diagram-e2e .mermaid");
-    const svg = wrap?.querySelector("svg");
-    if (!svg || wrap.dataset.scaled === "1") return;
-    const rect = svg.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const scale = E2E_DIAGRAM_SCALE;
-    svg.style.transform = "scale(" + scale + ")";
-    svg.style.transformOrigin = "top left";
-    wrap.style.width = Math.ceil(rect.width * scale) + "px";
-    wrap.style.height = Math.ceil(rect.height * scale) + "px";
-    wrap.dataset.scaled = "1";
-  }
-
-  function scheduleE2eScale() {
-    scaleE2eDiagram();
-    requestAnimationFrame(scaleE2eDiagram);
-    setTimeout(scaleE2eDiagram, 300);
-    setTimeout(scaleE2eDiagram, 1200);
-  }
-
-  window.addEventListener("load", scheduleE2eScale);
 </script>
 </body>
 </html>

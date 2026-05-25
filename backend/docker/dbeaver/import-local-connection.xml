@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<connections>
+  <connection
+    name="NL SQL Agent (local Docker)"
+    host="localhost"
+    port="5433"
+    database="investor_db_local"
+    url="jdbc:postgresql://localhost:5433/investor_db_local"
+    user="localdev"
+    password="localdev"
+    type="dev"/>
+</connections>

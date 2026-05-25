@@ -74,6 +74,40 @@ LIMIT 10;
 ./scripts/test_local_postgres_query.sh
 ```
 
+#### DBeaver (DB viewer)
+
+A connection **NL SQL Agent (local Docker)** is registered in DBeaver when you import or sync from this repo.
+
+| Field | Value |
+|-------|-------|
+| Host | `localhost` |
+| Port | `5433` |
+| Database | `investor_db_local` |
+| User | `localdev` |
+| Password | `localdev` (same as `LOCAL_PG_PASSWORD`) |
+
+**First connect:** password `localdev` (same as Docker `LOCAL_PG_PASSWORD`).
+
+If you see *SCRAM-based authentication, but no password was provided*:
+
+1. **Quit DBeaver** (Cmd+Q), reopen (reloads `data-sources.json`).
+2. **Edit connection** → set **Password** to `localdev` → enable **Save password** → **Test connection** → **Save**.
+
+Or re-import: **Database** → **Import connections** → choose `backend/docker/dbeaver/import-local-connection.xml` (includes user + password).
+
+DBeaver 25+ reads `configuration.password` in `data-sources.json` (not `auth-properties` alone).
+
+Importable connection JSON (for another machine): `backend/docker/dbeaver/data-sources.local.json`  
+(DBeaver: **Database** → **Driver Manager** not needed → **Database** → **New Database Connection** → **Import** from that file, or copy the `postgres-jdbc-nl-sql-agent-local` block into your workspace `data-sources.json`.)
+
+Keep **hdfcmf-dev-postgres** (VPN remote) for `clone_dev_db_docker.sh`; use the local connection for day-to-day SQL.
+
+**Smoke query:**
+
+```sql
+SELECT COUNT(*) FROM public.investor;
+```
+
 ### 2. Configure remote source URL
 
 ```bash

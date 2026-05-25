@@ -1,0 +1,44 @@
+{
+  "folders": {},
+  "connections": {
+    "postgres-jdbc-nl-sql-agent-local": {
+      "provider": "postgresql",
+      "driver": "postgres-jdbc",
+      "name": "NL SQL Agent (local Docker)",
+      "save-password": true,
+      "show-system-objects": true,
+      "configuration": {
+        "host": "localhost",
+        "port": "5433",
+        "database": "investor_db_local",
+        "url": "jdbc:postgresql://localhost:5433/investor_db_local?user=localdev&password=localdev",
+        "user": "localdev",
+        "password": "localdev",
+        "configurationType": "MANUAL",
+        "type": "dev",
+        "closeIdleConnection": true,
+        "properties": {
+          "connectTimeout": "20",
+          "loginTimeout": "20"
+        },
+        "auth-model": "native"
+      }
+    }
+  },
+  "connection-types": {
+    "dev": {
+      "name": "Development",
+      "color": "255,255,255",
+      "description": "Regular development database",
+      "auto-commit": true,
+      "confirm-execute": false,
+      "confirm-data-change": false,
+      "smart-commit": false,
+      "smart-commit-recover": true,
+      "auto-close-transactions": true,
+      "close-transactions-period": 1800,
+      "auto-close-connections": true,
+      "close-connections-period": 14400
+    }
+  }
+}

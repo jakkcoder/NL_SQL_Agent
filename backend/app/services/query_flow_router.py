@@ -32,6 +32,9 @@ def _normalize_generator_payload(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError(f"Catalog SQL generator JSON must be an object, got {type(raw).__name__}")
     out = dict(raw)
+    # Validation-repair models sometimes return only sql/parameters; satisfy the schema.
+    if not isinstance(out.get("thought"), str):
+        out["thought"] = ""
     params = out.get("parameters")
     if isinstance(params, str):
         text = params.strip()

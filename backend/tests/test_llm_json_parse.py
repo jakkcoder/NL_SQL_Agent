@@ -26,6 +26,14 @@ def test_normalize_generator_payload_rejects_non_object() -> None:
         _normalize_generator_payload(["ARN-0411"])
 
 
+def test_normalize_generator_payload_defaults_missing_thought() -> None:
+    out = _normalize_generator_payload(
+        {"sql": "SELECT 1", "parameters": ["ARN-0411"]},
+    )
+    assert out["thought"] == ""
+    assert out["sql"] == "SELECT 1"
+
+
 def test_parse_json_content_unwraps_double_encoded_string() -> None:
     inner = {
         "thought": "age filter",

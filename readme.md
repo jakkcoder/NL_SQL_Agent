@@ -82,6 +82,8 @@ This starts:
 
 In pgAdmin, open **Servers → NL SQL Agent (local clone)** and enter database password **`localdev`** when prompted.
 
+**DBeaver:** use connection **NL SQL Agent (local Docker)** — `localhost:5433`, database `investor_db_local`, user/password `localdev`. See [backend/docs/local_docker_postgres.md](backend/docs/local_docker_postgres.md#dbeaver-db-viewer).
+
 **Smoke-test SQL** (terminal):
 
 ```bash
@@ -153,7 +155,7 @@ Same UI, started via Google ADK instead of uvicorn:
 cd backend
 source .venv/bin/activate
 export PYTHONPATH=.
-adk web app/agents --port 8000 --reload
+adk web app/agents --port 8001 --reload
 ```
 
 Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) or [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/).
