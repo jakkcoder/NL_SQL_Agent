@@ -110,8 +110,8 @@ class IntentDetectionOutput(StrictSchemaModel):
     detection_source: Literal["llm", "fallback", "individual_only"] = "llm"
 
 
-class GenerateCatalogSqlToolOutput(StrictSchemaModel):
-    """Result of ``generate_catalog_sql_query_tool`` (generate, optional execute, optional one retry)."""
+class FilterDpInvestorMenuToolOutput(StrictSchemaModel):
+    """Result of ``run_filter_dp_investor_menu_query`` / ``filter_dp_investor_menu_tool``."""
 
     status: Literal["ok", "error", "blocked", "out_of_scope"] = "ok"
     reply: str
@@ -126,3 +126,7 @@ class GenerateCatalogSqlToolOutput(StrictSchemaModel):
     generator_model: str = ""
     validation_error: str | None = None
     execute_error: str | None = None
+
+
+# Deprecated name — use FilterDpInvestorMenuToolOutput.
+GenerateCatalogSqlToolOutput = FilterDpInvestorMenuToolOutput

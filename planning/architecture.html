@@ -121,6 +121,7 @@
     table.cost td.num { text-align: right; white-space: nowrap; }
     table.cost tr.total td { font-weight: 600; color: var(--text); }
     .note { font-size: 0.72rem; color: var(--muted); margin: 0.5rem 0 0; line-height: 1.4; }
+    .legend .batch { color: #fbbf24; border-color: #fbbf24; }
   </style>
 </head>
 <body>
@@ -128,11 +129,12 @@
 <header>
   <h1>NL SQL Agent — Architecture</h1>
   <p class="subtitle">
-    Distributor <strong>Individual investor</strong> chat: natural language → parameters for
-    <strong>one warehouse function only</strong> — <code>public.filter_dp_investor_menu</code> (HDFC portal
-    filters). No custom SQL on base tables. Unsupported asks get a standard capability reply. Six diagrams;
-    §6 covers <strong>infrastructure + LLM</strong> cost. See
-    <a href="../readme.md">readme.md</a> and <code>planning/complete_function.sql</code>.
+    Distributor <strong>Individual investor</strong> chat: root <strong>Haiku</strong> routes each message;
+    <strong>Sonnet</strong> (<code>BEDROCK_QUERY_GENERATOR_MODEL_ID</code>) reads
+    <code>filter_dp_investor_menu_catalog.json</code> + the user question and returns a strict
+    <code>SELECT … FROM public.filter_dp_investor_menu(…)</code> call (one automatic repair on failure).
+    No base-table SQL. §6 is an optional offline catalog refresh; §7 is infra + LLM cost.
+    See <a href="../readme.md">readme.md</a> and <code>planning/complete_function.sql</code>.
   </p>
 </header>
 
@@ -142,7 +144,8 @@
   <a href="#function-call">3. Function call</a>
   <a href="#capability">4. Capability</a>
   <a href="#data">5. Data layer</a>
-  <a href="#costing">6. Infra &amp; cost</a>
+  <a href="#catalog-generator">6. Catalog generator</a>
+  <a href="#costing">7. Infra &amp; cost</a>
 </nav>
 
 <div class="legend">
@@ -150,6 +153,7 @@
   <span class="llm">LLM (Bedrock / LiteLLM)</span>
   <span class="det">Deterministic</span>
   <span>Tool handler</span>
+  <span class="batch">On-demand job (Lambda / API)</span>
   <span style="border-color:#f59e0b;color:#f59e0b">PostgreSQL RPC</span>
 </div>
 
@@ -159,51 +163,43 @@
   <div class="diagram">
 <pre class="mermaid">
 flowchart TB
-  UI["Browser · ADK Web UI<br/>:8000"]
-  API["FastAPI · ADK /run"]
-  ROOT["Root LlmAgent<br/>investor_search_agent · Haiku<br/>3 tools · one per turn"]
-
-  subgraph TOOLS["tools.py"]
-    T1["greeting_tool<br/>capability intro"]
-    T2["detect_intent_tool"]
-    T3["generate_catalog_sql_query_tool<br/>name kept · function path"]
+  subgraph OFFLINE["Offline · not in POST /run"]
+    direction TB
+    EDIT["complete_function.sql + portal"] --> MENU["filter_dp_investor_menu_catalog.json"]
+    JOB["refresh_filter_catalog.py"] --> FC["filter_catalog.json"]
   end
 
-  subgraph FN_PIPE["Inside search tool — function only"]
-    HEU["Heuristic unsupported check"]
-    LLM["Param LLM · Sonnet/Haiku"]
-    BUILD["build_filter_dp_investor_menu_sql"]
-    VAL["validate_filter_dp_investor_menu_sql"]
-    EX["execute_filter_dp_investor_menu"]
-  end
+  UI["ADK Web UI :8000"] --> API["FastAPI POST /run"]
+  API --> H["Root agent · Haiku<br/>greeting_tool | filter_dp_investor_menu_tool"]
+  H -->|greeting| G["greeting_tool"]
+  H -->|investor question| T["filter_dp_investor_menu_tool"]
+  T --> Q["investor_menu_query.py"]
+  MENU -.->|function_contract| Q
+  Q --> S["Sonnet · dp_investor_menu_llm.py"]
+  S --> V["validate + execute · dp_investor_menu.py"]
+  V --> FN["filter_dp_investor_menu()"]
+  FN --> PG[(PostgreSQL)]
 
-  CAT["filter_dp_investor_menu_catalog.json<br/>filter_catalog.json"]
-  FN["public.filter_dp_investor_menu()"]
-  PG[(PostgreSQL<br/>:5433 local or remote)]
-
-  UI --> API --> ROOT
-  ROOT --> T1 & T2 & T3
-  T2 -.->|investor NL| T3
-  T3 --> HEU
-  HEU -->|unsupported| OOS["out_of_scope reply<br/>no SQL in session"]
-  HEU -->|ok| LLM --> BUILD --> VAL --> EX --> FN --> PG
-
-  LLM -.-> CAT
-  BUILD -.-> FN
-
-  classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
   classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
-  classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
   classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
-  class CAT,FN guide
-  class ROOT,LLM llm
-  class HEU,BUILD,VAL,EX det
-  class T1,T2,T3 tool
+  classDef svc fill:#312e81,stroke:#818cf8,color:#e7ecf3
+  classDef batch fill:#422006,stroke:#fbbf24,color:#fef3c7
+  classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
+  classDef db fill:#422006,stroke:#f59e0b,color:#fef3c7
+  class H,S llm
+  class G,T tool
+  class Q,V svc
+  class JOB batch
+  class MENU,FC,FN guide
+  class PG db
 </pre>
   </div>
   <p class="caption">
-    Entry: <code>backend/app/agents/investor_search_agent/agent.py</code> ·
-    Prompts: <code>system_prompts.py</code>, <code>filter_prompts.build_root_agent_instruction()</code>
+    <strong>Chat path:</strong> <code>investor_search_agent/agent.py</code> registers
+    <code>greeting_tool</code> and <code>filter_dp_investor_menu_tool</code> only.
+    Search logic is decoupled in <code>investor_menu_query.py</code> (no ADK import).
+    <strong>Offline:</strong> function contract JSON is edited when the portal function changes (§6);
+    <code>filter_catalog.json</code> refresh is optional warehouse metadata, not sent to Sonnet each turn.
   </p>
 </section>
 
@@ -213,87 +209,97 @@ flowchart TB
   <div class="diagram">
 <pre class="mermaid">
 flowchart TB
-  U([User message]) --> API["POST /run · session.state"]
-  API --> ROOT["Root Haiku picks 1 tool"]
+  U([User]) --> API["POST /run"]
+  API --> H["Root Haiku · route message"]
 
-  ROOT --> P{"Which tool?"}
+  H -->|greeting| G["greeting_tool → static intro"]
+  G --> RESP([Reply to user])
 
-  P -->|hi / thanks| G["greeting_tool"]
-  G --> OG["Static greeting"]
+  H -->|banking / non-Individual| R1["Agent text only · no tool"]
+  R1 --> RESP
 
-  P -->|optional| D["detect_intent_tool"]
-  D --> DC{"classify_message"}
-  DC -->|greeting| G
-  DC -->|banking / non-individual| OO["out_of_scope · no SQL"]
-  DC -->|investor data| SQL
+  H -->|investor question| T["filter_dp_investor_menu_tool"]
+  T --> Q["investor_menu_query"]
+  Q --> A{"ARN scope OK?"}
+  A -->|no| B["blocked"]
+  B --> RESP
 
-  P -->|investor NL| SQL["generate_catalog_sql_query_tool"]
+  A -->|yes| S["Sonnet · up to 2 attempts"]
+  S -->|unsupported_reason| OOS["out_of_scope · capability reply"]
+  OOS --> RESP
+  S -->|2nd failure| F["error · cannot generate query"]
+  F --> RESP
+  S -->|sql OK| OK["validate · execute · table + last_sql"]
+  OK --> RESP
 
-  SQL --> ARN{"arn_scope_guard"}
-  ARN -->|blocked| OB["blocked reply"]
-  ARN -->|ok| CAP{"Supported by<br/>filter_dp_investor_menu?"}
-  CAP -->|no · city/age/scheme analytics| OOS["out_of_scope<br/>standard capability reply<br/>no SQL"]
-  CAP -->|yes| FN["Function pipeline §3"]
-  FN --> OK["rows table + summary<br/>last_sql = function call only"]
-
-  OG & OO & OB & OOS & OK --> U2([User])
+  RESP --> U
 
   classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
   classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
   classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
-  class ROOT,FN llm
-  class DC,ARN,CAP det
-  class G,D,SQL tool
+  classDef fail fill:#422006,stroke:#f59e0b,color:#fef3c7
+  class H,S llm
+  class A,RESP det
+  class G,T tool
+  class F,OOS,B fail
 </pre>
   </div>
   <p class="caption">
-    <code>detect_intent_tool</code> is a shim for older prompts — same path as
-    <code>generate_catalog_sql_query_tool</code>. The tool name is unchanged for ADK compatibility;
-    it never generates ad-hoc SQL. Removed from root: legacy SearchPlan / catalog-SQL tools.
+    Root agent does intent routing inline (no <code>detect_intent_tool</code>).
+    Investor path: Sonnet receives <code>function_contract</code> + <code>question</code>; on generate/validate/execute
+    failure it gets one retry with <code>repair_context</code>, then
+    <code>build_query_generation_failed_reply()</code> if still failing.
+    LLM <code>unsupported_reason</code> uses a different template (capability / future version) and does not retry.
   </p>
 </section>
 
 <!-- 3. FUNCTION CALL -->
 <section id="function-call">
-  <h2>3. <code>filter_dp_investor_menu</code> pipeline (production)</h2>
+  <h2>3. Investor search pipeline (production)</h2>
   <div class="diagram">
 <pre class="mermaid">
-sequenceDiagram
-  autonumber
-  participant T as generate_catalog_sql_query_tool
-  participant H as investor_capability
-  participant L as dp_investor_menu_llm
-  participant B as dp_investor_menu
-  participant DB as PostgreSQL
+flowchart TB
+  T["filter_dp_investor_menu_tool"] --> Q["investor_menu_query.run_filter_dp_investor_menu_query"]
+  Q --> G1["arn_scope_guard"]
+  G1 --> L1["Sonnet · function_contract + question"]
+  L1 --> P{"JSON outcome?"}
 
-  T->>H: detect_unsupported_question
-  alt city / age / scheme analytics / PAN…
-    H-->>T: reason
-    T-->>T: out_of_scope · no final_query
-  else supported path
-    T->>L: question + catalog JSON
-    L-->>T: DpInvestorMenuParams JSON
-    alt unsupported_reason set
-      T-->>T: out_of_scope
-    else
-      T->>B: build_filter_dp_investor_menu_sql
-      B-->>T: SELECT FROM filter_dp_investor_menu(...)
-      T->>B: validate SQL shape + ARN bind
-      T->>DB: execute (parameterized)
-      DB-->>T: uuid, name, pan, dob, …
-    end
-  end
-  Note over T: session: final_query.engine = filter_dp_investor_menu
+  P -->|unsupported_reason| OOS["out_of_scope capability reply"]
+  OOS --> OUT["Return to ADK / user"]
+
+  P -->|sql + parameters| V["sql_guard · validate read-only function call"]
+  V --> E{"valid?"}
+  E -->|no · attempt 1| L2["Sonnet · + repair_context"]
+  L2 --> V
+
+  E -->|no · attempt 2| FAIL["cannot generate query"]
+  FAIL --> OUT
+
+  E -->|yes| DB["PostgreSQL · filter_dp_investor_menu()"]
+  DB --> OK["investor rows + session last_sql"]
+  OK --> OUT
+
+  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
+  classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
+  classDef fail fill:#422006,stroke:#f59e0b,color:#fef3c7
+  classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
+  classDef svc fill:#312e81,stroke:#818cf8,color:#e7ecf3
+  class L1,L2 llm
+  class G1,V,E,P det
+  class FAIL,OOS fail
+  class T tool
+  class Q,OK,OUT,DB svc
 </pre>
   </div>
   <p class="caption">
-    Single RPC aligned with HDFC portal Individual tab and
-    <code>planning/complete_function.sql</code>. SQL is always
-    <code>SELECT … FROM public.filter_dp_investor_menu(arncode, eligibility, otm, investortype,
-    investorsubtype[], holding, systematic, activity, searchtext, sortkey, sortvalue, pagelimit,
-    pageindex, allowbroker)</code> — composites as PostgreSQL <code>ROW(…)::current_holdings</code> etc.
-    Files: <code>tools.py</code>, <code>dp_investor_menu.py</code>, <code>dp_investor_menu_llm.py</code>,
-    <code>investor_capability.py</code>. Mapping CSV:
+    <strong>LLM input:</strong> <code>app/data/filter_dp_investor_menu_catalog.json</code> as
+    <code>function_contract</code> + user <code>question</code> (<code>dp_investor_menu_llm.py</code>).<br>
+    <strong>LLM output:</strong> strict <code>SELECT uuid, name, … FROM public.filter_dp_investor_menu(…)</code>
+    with <code>%s</code> binds; composites inline as <code>ROW(…)::type</code> per
+    <code>planning/complete_function.sql</code>.<br>
+    <strong>Code:</strong> <code>investor_menu_query.py</code>,
+    <code>dp_investor_menu_llm.py</code>, <code>dp_investor_menu.py</code> (validate/execute only),
+    <code>investor_capability.py</code> (reply templates). Portal mapping:
     <code>planning/Investor_Filter_Query_Mapping - Individual Investors.csv</code>.
   </p>
 </section>
@@ -304,7 +310,15 @@ sequenceDiagram
   <div class="diagram">
 <pre class="mermaid">
 flowchart TB
-  subgraph SUPPORTED["Supported via filter_dp_investor_menu"]
+  Q["User question"] --> SON["Sonnet + filter_dp_investor_menu_catalog.json"]
+  SON --> D{"Sonnet decision"}
+
+  D -->|maps to function params| RUN["validate · execute · return rows"]
+  D -->|unsupported_reason| MSG["out_of_scope · capability reply"]
+  D -->|2× generate / validate / execute fail| ERR["cannot generate query"]
+
+  subgraph SUPPORTED["Supported filter examples"]
+    direction TB
     A1["List all investors · default ALL"]
     A2["Eligibility YES/NO · OTM Y/NOT_AVAILABLE"]
     A3["ACTIVE / DORMANT"]
@@ -315,7 +329,8 @@ flowchart TB
     A8["Name search · searchtext %pattern%"]
   end
 
-  subgraph UNSUPPORTED["out_of_scope — standard reply"]
+  subgraph UNSUPPORTED["out_of_scope examples"]
+    direction TB
     U1["City / geography only"]
     U2["Age or DOB ranges"]
     U3["Equity hybrid liquid · top-N · FY"]
@@ -323,23 +338,23 @@ flowchart TB
     U5["Non-Individual investors"]
   end
 
-  Q["User question"] --> CHECK["Heuristic + param LLM"]
-  CHECK --> SUPPORTED
-  CHECK --> UNSUPPORTED
-  UNSUPPORTED --> MSG["Capability brief + not available now<br/>future version planned<br/>no SQL executed"]
+  RUN --> A1
+  MSG --> U1
 
   classDef ok fill:#134e4a,stroke:#10b981,color:#e7ecf3
   classDef no fill:#422006,stroke:#f59e0b,color:#fef3c7
-  class A1,A2,A3,A4,A5,A6,A7,A8 ok
-  class U1,U2,U3,U4,U5,MSG no
+  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
+  class A1,A2,A3,A4,A5,A6,A7,A8,RUN ok
+  class U1,U2,U3,U4,U5,MSG,ERR no
+  class SON llm
+  class D det
 </pre>
   </div>
   <p class="caption">
-  Portal screenshots: <code>planning/portal_screenshots/individual_investors/</code> ·
-  Catalog: <code>app/data/filter_dp_investor_menu_catalog.json</code>,
-  <code>app/data/filter_catalog.json</code> (v2, function metadata). Root agent and
-  <code>investor_capability.build_capability_greeting()</code> state what the assistant can answer.
-  Agent must not suggest querying <code>investor</code>, <code>customer_master</code>, or other base tables.
+  Portal screenshots: <code>planning/portal_screenshots/individual_investors/</code>.
+  Sonnet decides supported vs <code>unsupported_reason</code> using the contract file only (no regex pre-check).
+  Root greeting: <code>investor_capability.build_capability_greeting()</code>.
+  Never query base tables (<code>investor</code>, <code>customer_master</code>, etc.).
   </p>
 </section>
 
@@ -352,61 +367,101 @@ flowchart TB
   REMOTE[(Remote dev Postgres<br/>VPN · DEV_DATABASE_URL)]
   CLONE["clone_dev_db_docker.sh<br/>--subset or --accessible"]
   LOCAL[(Docker Postgres :5433<br/>investor_db_local)]
-  APP["App SQL execution<br/>USE_LOCAL_DOCKER_POSTGRES=true"]
+  DEPLOY["Deploy planning/complete_function.sql"]
+  FNDB["filter_dp_investor_menu() on database"]
+  APP["App · execute_filter_dp_investor_menu<br/>USE_LOCAL_DOCKER_POSTGRES=true"]
 
-  REMOTE --> CLONE --> LOCAL --> APP
-  REMOTE -.->|optional direct| APP
-
-  SQLITE[("filter_catalog_local.sqlite<br/>optional catalog refresh")]
-  SQLITE -.-> FC["filter_catalog.json"]
-  MENU["filter_dp_investor_menu_catalog.json"]
-  FNDB["filter_dp_investor_menu()<br/>in remote + local PG"]
-
-  LOCAL --> FNDB
-  REMOTE -.-> FNDB
-  MENU -.-> LLM["Param LLM"]
+  REMOTE --> CLONE --> LOCAL --> DEPLOY --> FNDB
+  LOCAL --> APP
+  APP -->|RPC only| FNDB
+  REMOTE -.->|optional · skip clone| APP
+  REMOTE -.->|optional · deploy on remote| FNDB
 
   classDef db fill:#422006,stroke:#f59e0b,color:#fef3c7
+  classDef svc fill:#312e81,stroke:#818cf8,color:#e7ecf3
   class REMOTE,LOCAL,FNDB db
+  class APP,DEPLOY svc
 </pre>
   </div>
   <p class="caption">
     The function must exist on the target database (deploy <code>planning/complete_function.sql</code>).
     Subset clone (~14 contract tables) supports local dev; app runtime calls the function, not ad-hoc joins.
+    Filter/catalog JSON artifacts and refresh jobs: <a href="#catalog-generator">§6</a>.
     Docs: <code>backend/docs/local_docker_postgres.md</code>.
     Security: ARN from session/config only · only <code>filter_dp_investor_menu</code> · no base-table SQL ·
     banking / non-individual blocked.
   </p>
 </section>
 
-<!-- 6. COSTING -->
-<section id="costing">
-  <h2>6. Infrastructure &amp; cost (planning)</h2>
+<!-- 6. CATALOG GENERATOR -->
+<section id="catalog-generator">
+  <h2>6. Function / filter catalog generator (on-demand)</h2>
+  <p class="caption" style="margin-top:0;margin-bottom:0.75rem">
+    Separate from the chat pipeline. Runs when the warehouse or portal function contract changes—not on every
+    user question. Same code can be wrapped in <strong>Lambda</strong>, <strong>EventBridge cron</strong>, or an
+    internal HTTP handler.
+  </p>
   <div class="diagram">
 <pre class="mermaid">
 flowchart TB
-  subgraph REQ["Per investor question — variable"]
-    BR["Amazon Bedrock<br/>Param LLM + root Haiku"]
-    BR2["No module router / SQL gen / repair"]
-  end
+  API["POST /internal/catalog/refresh<br/>planned · IAM-protected"]
+  LAMBDA["AWS Lambda handler"]
+  CRON["EventBridge · e.g. nightly"]
+  CLI["refresh_filter_catalog.py"]
+  TRG([On-demand trigger])
 
-  subgraph FIX["Fixed / monthly infrastructure"]
-    APP["App runtime<br/>FastAPI + ADK · uvicorn"]
-    PG["PostgreSQL<br/>warehouse read-only"]
-    NET["Network · VPN to dev DB"]
-    DEV["Local dev · Docker :5433 · Colima"]
-  end
+  API --> TRG
+  LAMBDA --> TRG
+  CRON --> TRG
+  CLI --> TRG
 
-  U["User"] --> APP
-  APP --> BR & BR2
+  PG[(PostgreSQL)] --> TRG
+  TRG --> REF["filter_catalog.refresh_catalog_from_db()"]
+  REF --> WRITE["Write filter_catalog.json"]
+  WRITE --> FC["filter_catalog.json<br/>optional warehouse metadata"]
+
+  SQL["complete_function.sql + portal"] --> MENU["filter_dp_investor_menu_catalog.json<br/>function contract"]
+  MENU --> CHAT["Sonnet in chat · every investor question"]
+
+  classDef batch fill:#422006,stroke:#fbbf24,color:#fef3c7
+  classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
+  classDef db fill:#422006,stroke:#f59e0b,color:#fef3c7
+  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
+  class API,LAMBDA,CRON,CLI,TRG,REF,WRITE batch
+  class MENU,FC guide
+  class PG db
+  class CHAT llm
+</pre>
+  </div>
+  <p class="caption">
+    <strong>What Sonnet uses each turn:</strong> only <code>filter_dp_investor_menu_catalog.json</code>
+    (<code>load_menu_catalog()</code>).<br>
+    <strong>Function contract maintenance:</strong> edit JSON when
+    <code>planning/complete_function.sql</code> or portal filters change (manual / release pipeline).<br>
+    <strong>Optional:</strong> <code>refresh_filter_catalog.py</code> → <code>filter_catalog.json</code>
+    (warehouse enum refresh; not required for chat). Deploy function to Postgres before running the app locally.
+  </p>
+</section>
+
+<!-- 7. COSTING -->
+<section id="costing">
+  <h2>7. Infrastructure &amp; cost (planning)</h2>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  U["User / distributor portal"] --> APP["App runtime<br/>FastAPI + ADK · uvicorn"]
+  APP --> BR["Bedrock · Haiku route"]
+  BR --> SON["Bedrock · Sonnet SQL gen"]
+  SON --> REP["Optional · 1 repair call"]
+  REP --> PG["PostgreSQL · filter_dp_investor_menu()"]
   APP --> PG
-  APP -.-> NET
-  DEV -.->|local only| PG
+  APP -.-> NET["Network · VPN to warehouse"]
+  DEV["Local dev · Docker :5433"] -.-> PG
 
   classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
   classDef infra fill:#422006,stroke:#f59e0b,color:#fef3c7
   classDef dev fill:#1e293b,stroke:#64748b,color:#cbd5e1
-  class BR,BR2 llm
+  class BR,SON,REP llm
   class APP,PG,NET infra
   class DEV dev
 </pre>
@@ -425,14 +480,14 @@ flowchart TB
       </thead>
       <tbody>
         <tr><td>LLM</td><td>Root Haiku (tool choice + reply)</td><td>On-demand tokens</td><td class="num">~$0.001</td></tr>
-        <tr><td>LLM</td><td>Menu param LLM (Sonnet or Haiku via config)</td><td>~2–4k in → ~0.5k out</td><td class="num">~$0.01–0.04</td></tr>
-        <tr><td>LLM</td><td>Heuristic unsupported (no LLM)</td><td>Regex only</td><td class="num">$0</td></tr>
+        <tr><td>LLM</td><td>Sonnet query gen (<code>BEDROCK_QUERY_GENERATOR_MODEL_ID</code>)</td><td>contract + question → sql JSON</td><td class="num">~$0.02–0.05</td></tr>
+        <tr><td>LLM</td><td>Sonnet repair (≤1 per failed question)</td><td>+ repair_context</td><td class="num">~$0.02–0.05 if used</td></tr>
         <tr><td>Compute</td><td>FastAPI worker (shared host)</td><td>Amortized CPU/RAM</td><td class="num">~$0.0001</td></tr>
         <tr><td>Database</td><td><code>filter_dp_investor_menu()</code> RPC</td><td>Shared warehouse / pool</td><td class="num">~$0</td></tr>
         <tr><td>Network</td><td>VPN / private link to DB</td><td>Usually existing</td><td class="num">~$0</td></tr>
-        <tr class="total"><td colspan="3"><strong>Investor search — happy path total</strong></td><td class="num"><strong>~$0.02–0.05</strong></td></tr>
-        <tr><td colspan="3">Greeting only (root Haiku)</td><td class="num">~$0.001</td></tr>
-        <tr><td colspan="3"><code>out_of_scope</code> (heuristic, no DB)</td><td class="num">~$0.001</td></tr>
+        <tr class="total"><td colspan="3"><strong>Investor search — typical total</strong></td><td class="num"><strong>~$0.03–0.06</strong></td></tr>
+        <tr><td colspan="3">Greeting only (Haiku)</td><td class="num">~$0.001</td></tr>
+        <tr><td colspan="3"><code>out_of_scope</code> (Sonnet, no execute)</td><td class="num">~$0.02–0.05</td></tr>
       </tbody>
     </table>
 
@@ -478,17 +533,17 @@ flowchart TB
       <thead>
         <tr>
           <th>Volume / month</th>
-          <th>LLM (mid ~$0.09 / q)</th>
+          <th>LLM (mid ~$0.04 / q)</th>
           <th>Infra (prod single-region)</th>
           <th>Combined (planning)</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td>100 questions</td><td class="num">~$3</td><td class="num">~$100</td><td class="num"><strong>~$103</strong></td></tr>
-        <tr><td>1,000</td><td class="num">~$30</td><td class="num">~$100</td><td class="num"><strong>~$130</strong></td></tr>
-        <tr><td>10,000</td><td class="num">~$300</td><td class="num">~$150</td><td class="num"><strong>~$450</strong></td></tr>
-        <tr><td>100,000</td><td class="num">~$3,000</td><td class="num">~$300</td><td class="num"><strong>~$3,300</strong></td></tr>
-        <tr><td>1,000,000</td><td class="num">~$30,000</td><td class="num">~$500</td><td class="num"><strong>~$30,500</strong></td></tr>
+        <tr><td>100 questions</td><td class="num">~$4</td><td class="num">~$100</td><td class="num"><strong>~$104</strong></td></tr>
+        <tr><td>1,000</td><td class="num">~$40</td><td class="num">~$100</td><td class="num"><strong>~$140</strong></td></tr>
+        <tr><td>10,000</td><td class="num">~$400</td><td class="num">~$150</td><td class="num"><strong>~$550</strong></td></tr>
+        <tr><td>100,000</td><td class="num">~$4,000</td><td class="num">~$300</td><td class="num"><strong>~$4,300</strong></td></tr>
+        <tr><td>1,000,000</td><td class="num">~$40,000</td><td class="num">~$500</td><td class="num"><strong>~$40,500</strong></td></tr>
       </tbody>
     </table>
 
@@ -496,8 +551,8 @@ flowchart TB
     <table class="cost">
       <thead><tr><th>Lever</th><th>Effect</th><th>Trade-off</th></tr></thead>
       <tbody>
-        <tr><td><code>QUERY_GENERATOR_LLM_MODEL</code> → Haiku</td><td>LLM −60–80% vs Sonnet</td><td>Test param mapping quality</td></tr>
-        <tr><td>Heuristic <code>detect_unsupported_question</code></td><td>Saves param LLM on obvious OOS</td><td>Keep patterns updated</td></tr>
+        <tr><td><code>BEDROCK_QUERY_GENERATOR_MODEL_ID</code> → Haiku</td><td>LLM −60–80% vs Sonnet</td><td>Test SQL quality on repair path</td></tr>
+        <tr><td>Single Sonnet repair only</td><td>Caps cost on bad prompts</td><td>Standard message after 2nd fail</td></tr>
         <tr><td>Shared warehouse vs new RDS clone</td><td>Infra −$50–500/mo</td><td>Function must exist on DB</td></tr>
         <tr><td>Local Docker subset clone</td><td>Dev infra $0</td><td>Deploy function + contract tables locally</td></tr>
       </tbody>
@@ -505,9 +560,8 @@ flowchart TB
 
     <p class="note">
       Infra rows are <strong>order-of-magnitude</strong> for capacity planning (ap-south-1–style single
-      app deployment), not invoices. At low volume, <strong>fixed infra</strong> can exceed LLM; above
-      At low volume, <strong>fixed infra</strong> can exceed LLM; function-only path is much cheaper than
-      retired catalog-SQL (no Sonnet SQL gen, module router, or repair loops). See appendix for removed path.
+      app deployment), not invoices. Catalog refresh (§6) is negligible cost vs chat LLM. Function-only path
+      is much cheaper than retired catalog-SQL. See appendix for removed path.
     </p>
   </div>
 </section>
@@ -516,21 +570,21 @@ flowchart TB
   <summary>Appendix — Retired catalog-SQL path (not in production)</summary>
   <div class="diagram" style="margin-top:0.75rem">
 <pre class="mermaid">
-flowchart LR
+flowchart TB
   NL["Natural language"] --> RTR["Module router Haiku"]
   RTR --> GUIDE["schema_guide_modules"]
   GUIDE --> GEN["SQL generator Sonnet"]
   GEN --> G["sql_guard"]
   G --> EX["catalog_sql_executor"]
-  EX --> PG[(PostgreSQL tables)]
+  EX --> PG[(PostgreSQL base tables)]
   classDef legacy fill:#1e293b,stroke:#64748b,color:#cbd5e1
-  class NL,RTR,GUIDE,GEN,G,EX legacy
+  class NL,RTR,GUIDE,GEN,G,EX,PG legacy
 </pre>
   </div>
   <p class="caption">
     Removed from production: modular schema guide + LLM-written <code>SELECT</code> on warehouse tables
     (<code>query_flow_router.py</code>, <code>schema_guide_modules/</code>, validation/execute repair).
-    <strong>Current production</strong> is §3 — parameters → <code>filter_dp_investor_menu</code> only.
+    <strong>Current production</strong> is §3 — Sonnet → strict <code>filter_dp_investor_menu</code> SQL only.
     Reference SQL for the function: <code>planning/complete_function.sql</code>.
   </p>
 </details>
@@ -543,8 +597,15 @@ flowchart LR
   mermaid.initialize({
     startOnLoad: true,
     theme: "dark",
-    flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: true, padding: 12 },
-    sequence: { mirrorActors: false, messageFontSize: 12, actorFontSize: 12 },
+    flowchart: {
+      curve: "linear",
+      htmlLabels: true,
+      useMaxWidth: true,
+      padding: 16,
+      diagramPadding: 12,
+      rankSpacing: 48,
+      nodeSpacing: 28
+    },
     themeVariables: {
       fontSize: "13px",
       primaryColor: "#1e3a5f",

@@ -2,25 +2,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import json
 
 import pytest
 
-from app.agents.tools import generate_catalog_sql_query_tool
 from app.core.config import get_config
 from app.models.agent_state import STATE_KEY_FINAL_QUERY, STATE_KEY_LAST_SQL
-from app.services.investor_capability import (
-    build_unsupported_capability_reply,
-    detect_unsupported_question,
-)
-
-
-def test_detect_age_question_unsupported() -> None:
-    assert detect_unsupported_question("Investor with Age between 30 and 40") is not None
-
-
-def test_detect_sip_question_supported() -> None:
-    assert detect_unsupported_question("Show investors with active SIP") is None
+from app.services.investor_capability import build_unsupported_capability_reply
+from app.services.investor_menu_query import run_filter_dp_investor_menu_query
 
 
 def test_unsupported_reply_mentions_future_version() -> None:
@@ -30,19 +19,35 @@ def test_unsupported_reply_mentions_future_version() -> None:
     assert "age filters" in text
 
 
-class _Ctx:
-    def __init__(self) -> None:
-        self.state: dict = {}
+def test_llm_out_of_scope_does_not_publish_sql(monkeypatch: pytest.MonkeyPatch) -> None:
+    import litellm
+    from unittest.mock import MagicMock
 
-
-def test_tool_out_of_scope_does_not_publish_sql(monkeypatch: pytest.MonkeyPatch) -> None:
     get_config.cache_clear()
     monkeypatch.setenv("CATALOG_SQL_EXECUTE_ENABLED", "false")
-    ctx = _Ctx()
-    out = generate_catalog_sql_query_tool("Investors in Mumbai only", ctx)
+    payload = json.dumps(
+        {
+            "thought": "city filter not supported",
+            "sql": None,
+            "parameters": [],
+            "unsupported_reason": "city or geography filters",
+        }
+    )
+    msg = MagicMock()
+    msg.content = payload
+    ch = MagicMock()
+    ch.message = msg
+    resp = MagicMock()
+    resp.choices = [ch]
+    monkeypatch.setattr(litellm, "completion", lambda **kwargs: resp)
+
+    state: dict = {}
+    out = run_filter_dp_investor_menu_query("Investors in Mumbai only", state).model_dump(
+        mode="json"
+    )
     assert out["status"] == "out_of_scope"
     assert out.get("sql") is None
-    assert STATE_KEY_FINAL_QUERY not in ctx.state
-    assert STATE_KEY_LAST_SQL not in ctx.state
+    assert STATE_KEY_FINAL_QUERY not in state
+    assert STATE_KEY_LAST_SQL not in state
     assert "not available" in (out.get("reply") or "").lower()
     assert "future version" in (out.get("reply") or "").lower()

@@ -218,8 +218,6 @@ class AppConfig(BaseSettings):
     aws_secrets_manager_prefix: str | None = Field(default=None, alias="AWS_SECRETS_MANAGER_PREFIX")
 
     filter_catalog_path: str | None = Field(default=None, alias="FILTER_CATALOG_PATH")
-    filter_catalog_sqlite_path: str | None = Field(default=None, alias="FILTER_CATALOG_SQLITE_PATH")
-    dev_local_sqlite_mirror: str | None = Field(default=None, alias="DEV_LOCAL_SQLITE_MIRROR")
     adk_web_ui: bool | None = Field(default=None, alias="ADK_WEB_UI")
 
     allowed_origins: str = Field(
@@ -259,8 +257,6 @@ class AppConfig(BaseSettings):
         "query_generator_llm_model",
         "query_generator_max_output_tokens",
         "bedrock_root_model_id",
-        "filter_catalog_sqlite_path",
-        "dev_local_sqlite_mirror",
         mode="before",
     )
     @classmethod
@@ -394,37 +390,9 @@ class AppConfig(BaseSettings):
         return active.get_secret_value() if active else None
 
     @property
-    def dev_local_sqlite_mirror_file_url(self) -> str | None:
-        """``sqlite:///...`` when ``DEV_LOCAL_SQLITE_MIRROR`` points at an existing file in dev."""
-
-        if not self.runtime.is_development:
-            return None
-        raw = (self.dev_local_sqlite_mirror or "").strip()
-        if not raw:
-            return None
-        path = Path(raw)
-        if not path.is_absolute():
-            backend_root = Path(__file__).resolve().parents[2]
-            path = backend_root / path
-        if path.is_file():
-            return f"sqlite:///{path.resolve()}"
-        return None
-
-    @property
     def filter_catalog_refresh_database_url(self) -> str | None:
-        """PostgreSQL warehouse URL or ``sqlite:///...`` for filter catalog merge only."""
+        """PostgreSQL warehouse URL for filter catalog merge (``refresh_catalog_from_db``)."""
 
-        mirror = self.dev_local_sqlite_mirror_file_url
-        if mirror:
-            return mirror
-        raw = (self.filter_catalog_sqlite_path or "").strip()
-        if raw:
-            path = Path(raw)
-            if not path.is_absolute():
-                backend_root = Path(__file__).resolve().parents[2]
-                path = backend_root / path
-            if path.is_file():
-                return f"sqlite:///{path.resolve()}"
         return self.database_url_value
 
     @property

@@ -11,11 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from app.db.postgres import DatabaseNotConfiguredError, PostgresClient
-from app.services.catalog_sqlite import (
-    SQLITE_CATALOG_FILTER_QUERIES,
-    fetch_all_sqlite,
-    is_sqlite_catalog_url,
-)
 from app.models.search_plan import (
     ActivityType,
     ALLOWED_DURATIONS,
@@ -265,12 +260,14 @@ def refresh_catalog_from_db(
         _write_catalog(catalog, output_path)
         return FilterCatalog(catalog)
 
-    catalog["source"] = "sqlite+contract" if is_sqlite_catalog_url(database_url) else "db+contract"
+    catalog["source"] = "db+contract"
 
-    if is_sqlite_catalog_url(database_url):
-        for db_key, sql in SQLITE_CATALOG_FILTER_QUERIES.items():
+    db = PostgresClient(database_url, statement_timeout_ms, min_size=1, max_size=1)
+    try:
+        db.open()
+        for db_key, sql in DB_FILTER_QUERIES.items():
             try:
-                rows = fetch_all_sqlite(database_url, sql)
+                rows = db.fetch_all(sql)
                 filter_key = _db_key_to_filter_key(db_key)
                 if filter_key:
                     _merge_db_values(catalog, db_key, filter_key, rows)
@@ -279,29 +276,12 @@ def refresh_catalog_from_db(
                         str(row.get("value")) for row in rows if row.get("value") is not None
                     ]
             except Exception as exc:
-                logger.warning("Filter catalog SQLite query %s failed: %s", db_key, exc)
+                logger.warning("Filter catalog query %s failed: %s", db_key, exc)
                 catalog.setdefault("db_errors", {})[db_key] = str(exc)
-    else:
-        db = PostgresClient(database_url, statement_timeout_ms, min_size=1, max_size=1)
-        try:
-            db.open()
-            for db_key, sql in DB_FILTER_QUERIES.items():
-                try:
-                    rows = db.fetch_all(sql)
-                    filter_key = _db_key_to_filter_key(db_key)
-                    if filter_key:
-                        _merge_db_values(catalog, db_key, filter_key, rows)
-                    else:
-                        catalog.setdefault("db_metadata", {})[db_key] = [
-                            str(row.get("value")) for row in rows if row.get("value") is not None
-                        ]
-                except Exception as exc:
-                    logger.warning("Filter catalog query %s failed: %s", db_key, exc)
-                    catalog.setdefault("db_errors", {})[db_key] = str(exc)
-        except DatabaseNotConfiguredError:
-            logger.warning("Database not configured; saving contract-only catalog.")
-        finally:
-            db.close()
+    except DatabaseNotConfiguredError:
+        logger.warning("Database not configured; saving contract-only catalog.")
+    finally:
+        db.close()
 
     _write_catalog(catalog, output_path)
     return FilterCatalog(catalog)

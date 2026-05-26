@@ -11,7 +11,6 @@ import json
 import logging
 from functools import lru_cache
 import re
-import sqlite3
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -382,44 +381,6 @@ def _sample_row_from_db_row(
     return out
 
 
-def _sqlite_table_candidates(schema: str, table: str) -> list[str]:
-    """Physical SQLite names used by the local mirror (``sync_filter_catalog_sqlite``)."""
-
-    names = [f"{schema}_{table}", table]
-    if schema == "public":
-        names.append(f"public.{table}")
-    return names
-
-
-def _fetch_sqlite_sample(
-    database_url: str,
-    schema: str,
-    table: str,
-    documented_columns: list[str],
-) -> dict[str, Any] | None:
-    from app.services.catalog_sqlite import sqlite_connect_path
-
-    path = sqlite_connect_path(database_url)
-    if not path.is_file():
-        return None
-    col_sql = ", ".join(f'"{c}"' for c in documented_columns) if documented_columns else "*"
-    conn = sqlite3.connect(str(path))
-    conn.row_factory = sqlite3.Row
-    try:
-        for candidate in _sqlite_table_candidates(schema, table):
-            try:
-                cur = conn.execute(f'SELECT {col_sql} FROM "{candidate}" LIMIT 1')
-                row = cur.fetchone()
-                if row is not None:
-                    raw = dict(row)
-                    return _sample_row_from_db_row(raw, documented_columns or list(raw.keys()))
-            except sqlite3.Error:
-                continue
-    finally:
-        conn.close()
-    return None
-
-
 def _fetch_postgres_sample(
     database_url: str,
     schema: str,
@@ -463,23 +424,18 @@ def fetch_sample_rows_for_contract_tables(
 ) -> tuple[dict[str, dict[str, Any] | None], str | None]:
     """First row per contract table (documented columns only). Returns (samples, source note)."""
 
-    from app.services.catalog_sqlite import is_sqlite_catalog_url
     from app.services.investor_schema_contract import INVESTOR_CONTRACT_TABLES
 
     if not database_url:
         return {}, "database_url not configured"
 
     samples: dict[str, dict[str, Any] | None] = {}
-    use_sqlite = is_sqlite_catalog_url(database_url)
-    source = "sqlite_mirror" if use_sqlite else "postgresql"
+    source = "postgresql"
 
     for schema, table in INVESTOR_CONTRACT_TABLES:
         fq = f"{schema}.{table}"
         doc_cols = documented_columns_by_fq.get(fq, [])
-        if use_sqlite:
-            samples[fq] = _fetch_sqlite_sample(database_url, schema, table, doc_cols)
-        else:
-            samples[fq] = _fetch_postgres_sample(database_url, schema, table, doc_cols)
+        samples[fq] = _fetch_postgres_sample(database_url, schema, table, doc_cols)
 
     return samples, source
 

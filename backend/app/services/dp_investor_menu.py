@@ -70,8 +70,19 @@ class MenuActivityFilter(BaseModel):
     duration: str = "1 month"
 
 
+class FilterDpInvestorMenuLlmTurn(BaseModel):
+    """Strict JSON from the menu query LLM: one ``filter_dp_investor_menu`` function call."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    thought: str = ""
+    sql: str | None = None
+    parameters: list[Any] = Field(default_factory=list)
+    unsupported_reason: str | None = None
+
+
 class DpInvestorMenuParams(BaseModel):
-    """Strict JSON from the menu-parameter LLM (no raw SQL)."""
+    """Portal filter fields (unit tests and contract documentation)."""
 
     model_config = ConfigDict(extra="forbid")
 

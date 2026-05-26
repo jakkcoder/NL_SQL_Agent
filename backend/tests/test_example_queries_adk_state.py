@@ -1,14 +1,14 @@
-"""Example NL strings: ``generate_catalog_sql_query_tool`` → ``filter_dp_investor_menu``."""
+"""Example NL strings: ``filter_dp_investor_menu_tool`` → ``filter_dp_investor_menu``."""
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 import pytest
 
-from app.agents.tools import generate_catalog_sql_query_tool
+from app.agents.tools import filter_dp_investor_menu_tool
 from app.core.config import get_config
+from tests.menu_llm_fixtures import menu_query_llm_json
 from app.models.agent_state import (
     STATE_KEY_FINAL_QUERY,
     STATE_KEY_LAST_SQL,
@@ -47,28 +47,6 @@ def _choice(content: str) -> MagicMock:
     return resp
 
 
-def _default_menu_params_json() -> str:
-    return json.dumps(
-        {
-            "thought": "stub",
-            "eligibility": "ALL",
-            "otm": "ALL",
-            "investor_type": "ALL",
-            "investor_subtypes": [],
-            "holding": None,
-            "systematic": None,
-            "activity": None,
-            "searchtext": None,
-            "sortkey": "first_name",
-            "sortvalue": "ASC",
-            "page_limit": 25,
-            "page_index": 0,
-            "allowbroker": "Y",
-            "unsupported_reason": None,
-        }
-    )
-
-
 @pytest.fixture
 def stub_menu_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     import litellm
@@ -78,7 +56,7 @@ def stub_menu_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         litellm,
         "completion",
-        lambda **kwargs: _choice(_default_menu_params_json()),
+        lambda **kwargs: _choice(menu_query_llm_json()),
     )
 
 
@@ -88,7 +66,7 @@ def test_generate_catalog_sql_tool_stores_final_query_in_state(
     query: str,
 ) -> None:
     tool_context = _FakeToolContext()
-    out = generate_catalog_sql_query_tool(query, tool_context)
+    out = filter_dp_investor_menu_tool(query, tool_context)
 
     assert out["status"] == "ok", out
     assert STATE_KEY_FINAL_QUERY in tool_context.state

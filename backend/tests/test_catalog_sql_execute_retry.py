@@ -1,14 +1,15 @@
-"""Execute path for ``generate_catalog_sql_query_tool`` (filter_dp_investor_menu)."""
+"""Execute path for ``filter_dp_investor_menu_tool`` (filter_dp_investor_menu)."""
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 import pytest
 
-from app.agents.tools import generate_catalog_sql_query_tool
+from app.agents.tools import filter_dp_investor_menu_tool
 from app.core.config import get_config
+from app.services.investor_capability import QUERY_GENERATION_FAILED_REPLY
+from tests.menu_llm_fixtures import menu_query_llm_json
 
 
 class _ToolCtx:
@@ -28,40 +29,18 @@ def _choice(content: str) -> MagicMock:
     return resp
 
 
-def _menu_params_payload() -> str:
-    return json.dumps(
-        {
-            "thought": "t",
-            "eligibility": "ALL",
-            "otm": "ALL",
-            "investor_type": "ALL",
-            "investor_subtypes": [],
-            "holding": None,
-            "systematic": None,
-            "activity": None,
-            "searchtext": None,
-            "sortkey": "first_name",
-            "sortvalue": "ASC",
-            "page_limit": 25,
-            "page_index": 0,
-            "allowbroker": "Y",
-            "unsupported_reason": None,
-        }
-    )
-
-
 def test_execute_success_returns_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import litellm
 
     get_config.cache_clear()
     monkeypatch.setenv("CATALOG_SQL_EXECUTE_ENABLED", "true")
-    monkeypatch.setattr(litellm, "completion", lambda **kwargs: _choice(_menu_params_payload()))
+    monkeypatch.setattr(litellm, "completion", lambda **kwargs: _choice(menu_query_llm_json()))
     monkeypatch.setattr(
-        "app.agents.tools.execute_filter_dp_investor_menu",
+        "app.services.investor_menu_query.execute_filter_dp_investor_menu",
         lambda *a, **k: [{"uuid": "x", "name": "Test"}],
     )
 
-    out = generate_catalog_sql_query_tool("show investors", _ToolCtx())
+    out = filter_dp_investor_menu_tool("show investors", _ToolCtx())
     assert out["status"] == "ok"
     assert out["executed"] is True
     assert out["row_count"] == 1
@@ -75,14 +54,15 @@ def test_execute_failure_returns_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
     get_config.cache_clear()
     monkeypatch.setenv("CATALOG_SQL_EXECUTE_ENABLED", "true")
-    monkeypatch.setattr(litellm, "completion", lambda **kwargs: _choice(_menu_params_payload()))
+    monkeypatch.setattr(litellm, "completion", lambda **kwargs: _choice(menu_query_llm_json()))
 
     def _fail(*a, **k):
         raise CatalogSqlExecuteError("function filter_dp_investor_menu failed")
 
-    monkeypatch.setattr("app.agents.tools.execute_filter_dp_investor_menu", _fail)
+    monkeypatch.setattr("app.services.investor_menu_query.execute_filter_dp_investor_menu", _fail)
 
-    out = generate_catalog_sql_query_tool("show investors", _ToolCtx())
+    out = filter_dp_investor_menu_tool("show investors", _ToolCtx())
     assert out["status"] == "error"
     assert out["executed"] is False
-    assert out["sql_retry_used"] is False
+    assert out["sql_retry_used"] is True
+    assert QUERY_GENERATION_FAILED_REPLY in out["reply"]

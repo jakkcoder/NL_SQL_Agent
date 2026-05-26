@@ -1,12 +1,10 @@
 # Full copy of the dev PostgreSQL database (local)
 
-Yes—you can keep a **full** copy of the dev warehouse **on your machine**, but it should stay **PostgreSQL → PostgreSQL**. The repo’s SQLite sync script is only for a **subset** of tables (catalog / contract convenience), not a whole-server clone.
-
-## Why not “entire DB in SQLite”?
+Yes—you can keep a **full** copy of the dev warehouse **on your machine**, but it should stay **PostgreSQL → PostgreSQL**.
 
 - Dev DBs usually use multiple schemas (`public`, `sphmf`, …), custom types, partitions, indexes, and sometimes extensions.
 - Application SQL in this project is written for **PostgreSQL** (`information_schema`, `NOW()`, `ANY(%s::TEXT[])`, etc.).
-- A faithful “everything” mirror is **`pg_dump` / `pg_restore`** (or logical replication), not SQLite.
+- A faithful “everything” mirror is **`pg_dump` / `pg_restore`** (or logical replication).
 
 ## Typical approach: dump from dev, restore into local Postgres
 
@@ -60,7 +58,7 @@ In `backend/.env`:
 DEV_DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/investor_db_local
 ```
 
-Unset `FILTER_CATALOG_SQLITE_PATH` if you want catalog merge to use this same DB, or keep SQLite for catalog-only offline work.
+Run `PYTHONPATH=. python scripts/refresh_filter_catalog.py` against the same URL when you need updated `filter_catalog.json`.
 
 ## Alternatives
 

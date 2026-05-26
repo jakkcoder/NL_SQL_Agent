@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 """Build ``investor_db_schema_guide.json`` and ``.md`` from ``investor_db_schema_contract.json``.
 
-Fetches one sample row per table from PostgreSQL (or a SQLite mirror) when a database URL is set.
+Fetches one sample row per table from PostgreSQL when a database URL is set.
 
 Usage:
     cd backend && export PYTHONPATH=. && python app/data/build_investor_schema_guide.py
 
     # explicit URL:
     python app/data/build_investor_schema_guide.py --database-url "$DEV_DATABASE_URL"
-
-    # offline partial samples (demo SQLite):
-    python scripts/init_dev_sqlite_demo.py
-    python app/data/build_investor_schema_guide.py \\
-      --database-url sqlite:///$(pwd)/app/data/dev_investor_demo.sqlite
 """
 
 from __future__ import annotations
@@ -36,11 +31,7 @@ _CATALOG = Path(__file__).resolve().parent / "filter_catalog.json"
 def _resolve_database_url(cli_url: str | None) -> str | None:
     if cli_url and cli_url.strip():
         return cli_url.strip()
-    cfg = get_config()
-    mirror = cfg.dev_local_sqlite_mirror_file_url
-    if mirror:
-        return mirror
-    return cfg.database_url_value
+    return get_config().database_url_value
 
 
 def main() -> int:
@@ -48,7 +39,7 @@ def main() -> int:
     parser.add_argument(
         "--database-url",
         default=None,
-        help="PostgreSQL or sqlite:/// URL for sample rows (else DEV_DATABASE_URL / SQLite mirror)",
+        help="PostgreSQL URL for sample rows (else DEV_DATABASE_URL / local Docker Postgres)",
     )
     parser.add_argument(
         "--skip-samples",

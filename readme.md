@@ -4,13 +4,13 @@ Local/dev-first MVP for a mutual fund distributor **Individual investor** search
 
 The backend uses Google ADK for the agent and keeps SQL execution deterministic:
 
-- **Individual investors:** **`generate_catalog_sql_query_tool`** maps natural language to parameters for the warehouse function **`public.filter_dp_investor_menu`** (portal-aligned filters; see `planning/complete_function.sql` and `app/data/filter_dp_investor_menu_catalog.json`), then executes `SELECT * FROM public.filter_dp_investor_menu(...)`.
+- **Individual investors:** **`filter_dp_investor_menu_tool`** (ADK) calls **`run_filter_dp_investor_menu_query`** in `app/services/investor_menu_query.py`, which maps natural language to parameters for **`public.filter_dp_investor_menu`** (portal-aligned filters; see `planning/complete_function.sql` and `app/data/filter_dp_investor_menu_catalog.json`), then executes `SELECT * FROM public.filter_dp_investor_menu(...)`.
 - Non-Individual investor search is **not** in this MVP.
 - Out of scope: pending investors, PAN/folio/mobile/email lookup, flexible duration phrases (unless enabled as above for contract-grounded reporting only).
 
 **Schema for SQL generation:** Packaged `investor_db_schema_guide.json` and modular guides under `app/data/schema_guide_modules/`. Refresh contract JSON from Postgres with `PYTHONPATH=. python app/data/export_investor_schema_contract.py` from `backend/`.
 
-**Filter catalog without hitting the warehouse every session:** Run `PYTHONPATH=. python scripts/sync_filter_catalog_sqlite.py` from `backend/` (while connected to Postgres). By default it copies **all 14** investor-contract tables (`INVESTOR_CONTRACT_TABLES`) into SQLite as `public_*` / `sphmf_*` tables plus **6 views** so catalog merge SQL still works. Use `--mode catalog` for a quick **6-table** copy only. Set `FILTER_CATALOG_SQLITE_PATH=app/data/filter_catalog_local.sqlite` in `backend/.env`, **or** set `DEV_LOCAL_SQLITE_MIRROR` to the same path in **development** to also **skip live schema introspection** (packaged `investor_db_schema_contract.json` only) while still using `DEV_DATABASE_URL` for executing warehouse SQL. This mirror is **not** every table in the remote cluster—only the contract the app uses; for a full Postgres clone use `pg_dump` to a local Postgres instance.
+**Filter catalog refresh (on-demand):** Run `PYTHONPATH=. python scripts/refresh_filter_catalog.py` from `backend/` against Postgres (`DEV_DATABASE_URL` or local Docker) to merge warehouse distincts into `app/data/filter_catalog.json`. This is separate from the chat path—see `planning/architecture.html` §6.
 
 ## Prerequisites
 
@@ -21,8 +21,6 @@ The backend uses Google ADK for the agent and keeps SQL execution deterministic:
 **`DEV_DATABASE_URL`:** use `postgresql://USER:PASSWORD@HOST:PORT/DATABASE`. If the password contains `@`, `#`, or other reserved characters, **URL-encode** them (for `@` use `%40`). If TLS is required, append `?sslmode=require`. Put the final URL only in `backend/.env` (never commit it).
 
 **Offline local Postgres (Docker):** Clone dev once, then run the chatbot against **localhost:5433** without VPN. See [Local Docker PostgreSQL](#local-docker-postgresql) below.
-
-**Offline catalog mirror (dev):** Run `PYTHONPATH=. python scripts/init_dev_sqlite_demo.py` to create `app/data/dev_investor_demo.sqlite`. Set `DEV_LOCAL_SQLITE_MIRROR` to that path for catalog refresh without VPN Postgres. SQL execution still uses PostgreSQL unless you use local Docker Postgres.
 
 Use the virtualenv at **`backend/.venv`** only. Do **not** use a repo-root `.venv` (missing deps, wrong `app` imports).
 
@@ -47,9 +45,8 @@ Edit `backend/.env`:
 | `DEV_DATABASE_URL` | Remote read-only URL (clone source; optional when local Docker is on) |
 | `DEFAULT_DEV_ARN` | `ARN-0411` |
 | `DYNAMIC_SQL_LLM_MODEL` | optional catalog SQL generator override (LiteLLM) |
-| `BEDROCK_QUERY_GENERATOR_MODEL_ID` | large-context Bedrock model for `generate_catalog_sql_query_tool` (default Sonnet 3.5) |
+| `BEDROCK_QUERY_GENERATOR_MODEL_ID` | Sonnet model for `filter_dp_investor_menu` SQL generation (contract + question) |
 | `QUERY_GENERATOR_LLM_MODEL` | optional LiteLLM override for the catalog SQL generator |
-| `FILTER_CATALOG_SQLITE_PATH` | optional; SQLite file for catalog merge only |
 | `LLM_PROVIDER` | `bedrock` |
 | `BEDROCK_MODEL_ID` | small/fast Bedrock model for the **root ADK agent** (default Haiku) |
 | `BEDROCK_ROOT_MODEL_ID` | optional root override (else `BEDROCK_MODEL_ID`) |
@@ -276,7 +273,7 @@ curl -X POST http://127.0.0.1:8000/run \
 
 ### ADK session state (`final_query` / `last_sql`)
 
-When **`generate_catalog_sql_query_tool`** runs, it **writes** `final_query`, `last_sql`, and `last_sql_parameters` with the catalog SQL generator output (`engine`: `catalog_sql_generator`) for debugging and downstream viewers.
+When **`run_filter_dp_investor_menu_query`** runs (via **`filter_dp_investor_menu_tool`**), it **writes** `final_query`, `last_sql`, and `last_sql_parameters` with `engine`: `filter_dp_investor_menu` for debugging and downstream viewers.
 
 **Geography** (e.g. “investors in Mumbai”) depends on what the catalog generator can express in SQL from **filter_catalog_json** (``parameter`` hints and allowed ``values``); extend the catalog and prompts if you need stricter city predicates.
 
@@ -300,11 +297,11 @@ See `backend/scripts/README.md` for all maintenance scripts.
 
 ### LLM calls per turn (current catalog SQL path)
 
-Investor data questions run **`generate_catalog_sql_query_tool`** (directly or via **`detect_intent_tool`**). Each successful path uses **multiple LiteLLM calls** inside the tool—not a single model.
+Investor data questions: root Haiku calls **`filter_dp_investor_menu_tool`** → **`investor_menu_query`** sends **`filter_dp_investor_menu_catalog.json`** + the user question to **Sonnet** (`BEDROCK_QUERY_GENERATOR_MODEL_ID`), which returns the strict function-call SQL.
 
 | Step | When | Model tier (default) | Config |
 |------|------|----------------------|--------|
-| 1. Root ADK agent | Every user message (picks tool, may summarize) | Haiku — `BEDROCK_MODEL_ID` | 1–2 completions if the model calls `detect_intent_tool` then replies |
+| 1. Root ADK agent | Every user message (intent + tool choice, may summarize) | Haiku — `BEDROCK_MODEL_ID` | 1 completion (+ tool call) |
 | 2. Schema guide module router | Each catalog SQL generation | Haiku — `BEDROCK_MODULE_ROUTER_MODEL_ID` or root | Skipped if `QUERY_GENERATOR_MODULE_ROUTER_LLM=false` (keyword routing only) |
 | 3. Catalog SQL generator | Each catalog SQL generation | **Sonnet** — `BEDROCK_QUERY_GENERATOR_MODEL_ID` | Largest prompt (~modular guide, up to `QUERY_GENERATOR_MODULAR_GUIDE_MAX_CHARS`) |
 | 4. Validation repair | Only if `sql_guard` rejects SQL | Haiku — `BEDROCK_CATALOG_SQL_VALIDATION_REPAIR_MODEL_ID` | `CATALOG_SQL_VALIDATION_REPAIR_ENABLED=true` (default); max 1× |

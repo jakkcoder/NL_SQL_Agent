@@ -235,7 +235,7 @@ def main() -> int:
         sql = _sql_from_session(state)
 
         if tool is None:
-            row["issues"].append("Root agent did not return generate_catalog_sql_query_tool response")
+            row["issues"].append("Root agent did not return filter_dp_investor_menu_tool response")
         else:
             row["tool_status"] = tool.get("status")
             row["executed"] = tool.get("executed")

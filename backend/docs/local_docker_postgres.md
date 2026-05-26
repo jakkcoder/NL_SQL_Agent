@@ -149,7 +149,7 @@ In `backend/.env`:
 DEV_DATABASE_URL=postgresql://localdev:localdev@localhost:5433/investor_db_local
 ```
 
-Restart uvicorn. Optional: unset `FILTER_CATALOG_SQLITE_PATH` / `DEV_LOCAL_SQLITE_MIRROR` if you want catalog merge and SQL execution to use this same DB.
+Restart uvicorn. Catalog refresh (`scripts/refresh_filter_catalog.py`) uses the same Postgres URL as SQL execution when `USE_LOCAL_DOCKER_POSTGRES=true`.
 
 ### 5. Stop container (data kept)
 

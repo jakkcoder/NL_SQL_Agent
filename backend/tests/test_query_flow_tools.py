@@ -1,13 +1,12 @@
-"""Unit tests for ``generate_catalog_sql_query_tool`` (mocked menu-param LLM)."""
+"""Unit tests for ``filter_dp_investor_menu_tool`` / ``investor_menu_query`` (mocked param LLM)."""
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 import pytest
 
-from app.agents.tools import generate_catalog_sql_query_tool
+from app.agents.tools import filter_dp_investor_menu_tool
 from app.core.config import get_config
 from app.models.agent_state import (
     STATE_KEY_QUERY_FLOW_TRACE,
@@ -40,31 +39,17 @@ def test_generate_catalog_sql_query_tool_returns_sql_only(monkeypatch: pytest.Mo
 
     get_config.cache_clear()
     monkeypatch.setenv("CATALOG_SQL_EXECUTE_ENABLED", "false")
-    trusted = _get_config().search.default_dev_arn
-    llm_payload = json.dumps(
-        {
-            "thought": "default list",
-            "eligibility": "ALL",
-            "otm": "ALL",
-            "investor_type": "ALL",
-            "investor_subtypes": [],
-            "holding": None,
-            "systematic": None,
-            "activity": None,
-            "searchtext": None,
-            "sortkey": "first_name",
-            "sortvalue": "ASC",
-            "page_limit": 25,
-            "page_index": 0,
-            "allowbroker": "Y",
-            "unsupported_reason": None,
-        }
+    from tests.menu_llm_fixtures import menu_query_llm_json
+
+    llm_payload = menu_query_llm_json(
+        trusted_arn=_get_config().search.default_dev_arn,
+        thought="default list",
     )
 
     monkeypatch.setattr(litellm, "completion", lambda **kwargs: _choice(llm_payload))
 
     ctx = _ToolCtx()
-    out = generate_catalog_sql_query_tool("show my investors", ctx)
+    out = filter_dp_investor_menu_tool("show my investors", ctx)
     assert out["status"] == "ok"
     assert "filter_dp_investor_menu" in (out.get("sql") or "")
     assert out["executed"] is False
@@ -73,4 +58,4 @@ def test_generate_catalog_sql_query_tool_returns_sql_only(monkeypatch: pytest.Mo
     fq = ctx.state[STATE_KEY_FINAL_QUERY]
     assert fq.get("engine") == "filter_dp_investor_menu"
     trace = ctx.state[STATE_KEY_QUERY_FLOW_TRACE]
-    assert isinstance(trace, list) and trace[-1].get("phase") == "filter_dp_investor_menu_params"
+    assert isinstance(trace, list) and trace[-1].get("phase") == "filter_dp_investor_menu_query"
