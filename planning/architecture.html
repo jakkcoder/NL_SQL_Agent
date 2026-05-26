@@ -128,27 +128,29 @@
 <header>
   <h1>NL SQL Agent — Architecture</h1>
   <p class="subtitle">
-    Distributor <strong>Individual investor</strong> chat: natural language → modular schema guide →
-    read-only PostgreSQL. Six diagrams below; §6 adds <strong>infrastructure + LLM</strong> cost planning.
-    Full model-mix matrix: <a href="../readme.md#model-mix-comparison-cost-impact-vs-current-defaults">readme.md</a>.
+    Distributor <strong>Individual investor</strong> chat: natural language → parameters for
+    <strong>one warehouse function only</strong> — <code>public.filter_dp_investor_menu</code> (HDFC portal
+    filters). No custom SQL on base tables. Unsupported asks get a standard capability reply. Six diagrams;
+    §6 covers <strong>infrastructure + LLM</strong> cost. See
+    <a href="../readme.md">readme.md</a> and <code>planning/complete_function.sql</code>.
   </p>
 </header>
 
 <nav>
   <a href="#system">1. System</a>
   <a href="#request">2. Request path</a>
-  <a href="#catalog-sql">3. Catalog SQL</a>
-  <a href="#schema-guide">4. Schema guide</a>
+  <a href="#function-call">3. Function call</a>
+  <a href="#capability">4. Capability</a>
   <a href="#data">5. Data layer</a>
   <a href="#costing">6. Infra &amp; cost</a>
 </nav>
 
 <div class="legend">
-  <span class="guide">Schema guide</span>
+  <span class="guide">Portal / catalog JSON</span>
   <span class="llm">LLM (Bedrock / LiteLLM)</span>
   <span class="det">Deterministic</span>
   <span>Tool handler</span>
-  <span style="border-color:#f59e0b;color:#f59e0b">PostgreSQL</span>
+  <span style="border-color:#f59e0b;color:#f59e0b">PostgreSQL RPC</span>
 </div>
 
 <!-- 1. SYSTEM -->
@@ -162,35 +164,40 @@ flowchart TB
   ROOT["Root LlmAgent<br/>investor_search_agent · Haiku<br/>3 tools · one per turn"]
 
   subgraph TOOLS["tools.py"]
-    T1["greeting_tool"]
+    T1["greeting_tool<br/>capability intro"]
     T2["detect_intent_tool"]
-    T3["generate_catalog_sql_query_tool"]
+    T3["generate_catalog_sql_query_tool<br/>name kept · function path"]
   end
 
-  subgraph SQL_PIPE["Inside catalog SQL tool"]
-    RTR["Module router · Haiku"]
-    GEN["SQL generator · Sonnet"]
-    G["sql_guard"]
-    EX["catalog_sql_executor"]
+  subgraph FN_PIPE["Inside search tool — function only"]
+    HEU["Heuristic unsupported check"]
+    LLM["Param LLM · Sonnet/Haiku"]
+    BUILD["build_filter_dp_investor_menu_sql"]
+    VAL["validate_filter_dp_investor_menu_sql"]
+    EX["execute_filter_dp_investor_menu"]
   end
 
-  GUIDE["schema_guide_modules<br/>+ question_patterns"]
+  CAT["filter_dp_investor_menu_catalog.json<br/>filter_catalog.json"]
+  FN["public.filter_dp_investor_menu()"]
   PG[(PostgreSQL<br/>:5433 local or remote)]
 
   UI --> API --> ROOT
   ROOT --> T1 & T2 & T3
   T2 -.->|investor NL| T3
-  T3 --> RTR --> GUIDE --> GEN --> G --> EX --> PG
-  GEN -.->|validate fail| FIX["Validation repair · Haiku"]
-  EX -.->|DB error| GEN
+  T3 --> HEU
+  HEU -->|unsupported| OOS["out_of_scope reply<br/>no SQL in session"]
+  HEU -->|ok| LLM --> BUILD --> VAL --> EX --> FN --> PG
+
+  LLM -.-> CAT
+  BUILD -.-> FN
 
   classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
   classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
   classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
   classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
-  class GUIDE guide
-  class ROOT,RTR,GEN,FIX llm
-  class G det
+  class CAT,FN guide
+  class ROOT,LLM llm
+  class HEU,BUILD,VAL,EX det
   class T1,T2,T3 tool
 </pre>
   </div>
@@ -224,101 +231,115 @@ flowchart TB
 
   SQL --> ARN{"arn_scope_guard"}
   ARN -->|blocked| OB["blocked reply"]
-  ARN -->|ok| CS["Catalog SQL pipeline §3"]
-  CS --> OK["rows table + summary<br/>last_sql in state"]
+  ARN -->|ok| CAP{"Supported by<br/>filter_dp_investor_menu?"}
+  CAP -->|no · city/age/scheme analytics| OOS["out_of_scope<br/>standard capability reply<br/>no SQL"]
+  CAP -->|yes| FN["Function pipeline §3"]
+  FN --> OK["rows table + summary<br/>last_sql = function call only"]
 
-  OG & OO & OB & OK --> U2([User])
+  OG & OO & OB & OOS & OK --> U2([User])
 
   classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
   classDef det fill:#134e4a,stroke:#10b981,color:#e7ecf3
   classDef tool fill:#1e293b,stroke:#94a3b8,color:#e7ecf3
-  class ROOT,CS llm
-  class DC,ARN det
+  class ROOT,FN llm
+  class DC,ARN,CAP det
   class G,D,SQL tool
 </pre>
   </div>
   <p class="caption">
-    <code>detect_intent_tool</code> is a shim for older prompts — same SQL path as calling
-    <code>generate_catalog_sql_query_tool</code> directly. Removed from root:
-    <code>search_investors_tool</code>, <code>analyze_search_arguments_tool</code>.
+    <code>detect_intent_tool</code> is a shim for older prompts — same path as
+    <code>generate_catalog_sql_query_tool</code>. The tool name is unchanged for ADK compatibility;
+    it never generates ad-hoc SQL. Removed from root: legacy SearchPlan / catalog-SQL tools.
   </p>
 </section>
 
-<!-- 3. CATALOG SQL -->
-<section id="catalog-sql">
-  <h2>3. Catalog SQL pipeline</h2>
+<!-- 3. FUNCTION CALL -->
+<section id="function-call">
+  <h2>3. <code>filter_dp_investor_menu</code> pipeline (production)</h2>
   <div class="diagram">
 <pre class="mermaid">
 sequenceDiagram
   autonumber
   participant T as generate_catalog_sql_query_tool
-  participant R as query_flow_router
-  participant M as module_router Haiku
-  participant G as SQL generator Sonnet
-  participant S as sql_guard
-  participant V as validation_repair Haiku
-  participant E as catalog_sql_executor
+  participant H as investor_capability
+  participant L as dp_investor_menu_llm
+  participant B as dp_investor_menu
   participant DB as PostgreSQL
 
-  T->>R: question + session_arn
-  R->>M: select module ids
-  M-->>R: core_arn_investor + …
-  R->>G: slim guide JSON + question
-  G-->>R: sql + parameters
-  R->>S: sanitize · normalize
-  T->>S: validate read-only · ARN-first %s
-  alt guard fails
-    T->>V: failed_sql + error
-    V-->>T: corrected sql
-    T->>S: re-validate
+  T->>H: detect_unsupported_question
+  alt city / age / scheme analytics / PAN…
+    H-->>T: reason
+    T-->>T: out_of_scope · no final_query
+  else supported path
+    T->>L: question + catalog JSON
+    L-->>T: DpInvestorMenuParams JSON
+    alt unsupported_reason set
+      T-->>T: out_of_scope
+    else
+      T->>B: build_filter_dp_investor_menu_sql
+      B-->>T: SELECT FROM filter_dp_investor_menu(...)
+      T->>B: validate SQL shape + ARN bind
+      T->>DB: execute (parameterized)
+      DB-->>T: uuid, name, pan, dob, …
+    end
   end
-  T->>E: execute_catalog_sql_readonly
-  E->>DB: parameterized SELECT
-  alt Postgres error
-    T->>G: repair_context
-    G-->>T: fixed sql
-    T->>E: retry once
-  end
-  DB-->>T: rows · dedupe by uuid
-  Note over T: session: final_query, last_sql, query_flow_trace
+  Note over T: session: final_query.engine = filter_dp_investor_menu
 </pre>
   </div>
   <p class="caption">
-    Guards: read-only, LIMIT ≤ 500, ARN first bind, no split name filters (normalized
-    <code>concat_ws</code> + strip spaces), <code>DISTINCT ON (i.uuid)</code> for investor lists.
-    Files: <code>tools.py</code>, <code>query_flow_router.py</code>, <code>sql_guard.py</code>,
-    <code>catalog_sql_executor.py</code>.
+    Single RPC aligned with HDFC portal Individual tab and
+    <code>planning/complete_function.sql</code>. SQL is always
+    <code>SELECT … FROM public.filter_dp_investor_menu(arncode, eligibility, otm, investortype,
+    investorsubtype[], holding, systematic, activity, searchtext, sortkey, sortvalue, pagelimit,
+    pageindex, allowbroker)</code> — composites as PostgreSQL <code>ROW(…)::current_holdings</code> etc.
+    Files: <code>tools.py</code>, <code>dp_investor_menu.py</code>, <code>dp_investor_menu_llm.py</code>,
+    <code>investor_capability.py</code>. Mapping CSV:
+    <code>planning/Investor_Filter_Query_Mapping - Individual Investors.csv</code>.
   </p>
 </section>
 
-<!-- 4. SCHEMA GUIDE -->
-<section id="schema-guide">
-  <h2>4. Schema guide (modular prompt)</h2>
+<!-- 4. CAPABILITY -->
+<section id="capability">
+  <h2>4. Capability boundaries &amp; portal filters</h2>
   <div class="diagram">
 <pre class="mermaid">
-flowchart LR
-  Q["User question"] --> SEL["select modules"]
-  SEL --> H["Haiku router"]
-  SEL --> K["keyword fallback<br/>manifest.json"]
-  H --> IDS["1–3 modules + core_arn_investor"]
-  K --> IDS
-  IDS --> L["load JSON modules"]
-  L --> P["Payload: tables · join_recipes<br/>question_patterns · filter_vocabulary"]
-  P --> G["Sonnet writes SQL"]
+flowchart TB
+  subgraph SUPPORTED["Supported via filter_dp_investor_menu"]
+    A1["List all investors · default ALL"]
+    A2["Eligibility YES/NO · OTM Y/NOT_AVAILABLE"]
+    A3["ACTIVE / DORMANT"]
+    A4["Subtype CGF · MINOR · OTHERS"]
+    A5["Holdings WITH/WITHOUT"]
+    A6["Systematic SIP STP SWP …"]
+    A7["Activity PURCHASE REDEMPTION … + duration"]
+    A8["Name search · searchtext %pattern%"]
+  end
 
-  classDef guide fill:#3b2667,stroke:#a78bfa,color:#e7ecf3
-  classDef llm fill:#1e3a5f,stroke:#60a5fa,color:#e7ecf3
-  class L,P,IDS guide
-  class H,G llm
+  subgraph UNSUPPORTED["out_of_scope — standard reply"]
+    U1["City / geography only"]
+    U2["Age or DOB ranges"]
+    U3["Equity hybrid liquid · top-N · FY"]
+    U4["PAN folio mobile lookup"]
+    U5["Non-Individual investors"]
+  end
+
+  Q["User question"] --> CHECK["Heuristic + param LLM"]
+  CHECK --> SUPPORTED
+  CHECK --> UNSUPPORTED
+  UNSUPPORTED --> MSG["Capability brief + not available now<br/>future version planned<br/>no SQL executed"]
+
+  classDef ok fill:#134e4a,stroke:#10b981,color:#e7ecf3
+  classDef no fill:#422006,stroke:#f59e0b,color:#fef3c7
+  class A1,A2,A3,A4,A5,A6,A7,A8 ok
+  class U1,U2,U3,U4,U5,MSG no
 </pre>
   </div>
   <p class="caption">
-    Build: <code>python scripts/build_schema_guide_modules.py</code> ·
-    Patterns: <code>investor_schema_question_patterns.py</code> ·
-    Modules: <code>core_arn_investor</code>, <code>activity_transactions</code>,
-    <code>sip_systematic</code>, <code>holdings_schemes</code>, <code>geography_city</code>,
-    <code>investor_filters</code>, <code>tax_profile</code>, <code>dormant_holdings</code>, … ·
-    Use <code>pt.trxn_date</code> on <code>processed_trxns</code> (not <code>l_trxn_date</code>).
+  Portal screenshots: <code>planning/portal_screenshots/individual_investors/</code> ·
+  Catalog: <code>app/data/filter_dp_investor_menu_catalog.json</code>,
+  <code>app/data/filter_catalog.json</code> (v2, function metadata). Root agent and
+  <code>investor_capability.build_capability_greeting()</code> state what the assistant can answer.
+  Agent must not suggest querying <code>investor</code>, <code>customer_master</code>, or other base tables.
   </p>
 </section>
 
@@ -336,17 +357,25 @@ flowchart TB
   REMOTE --> CLONE --> LOCAL --> APP
   REMOTE -.->|optional direct| APP
 
-  SQLITE[("filter_catalog_local.sqlite<br/>catalog merge only")]
+  SQLITE[("filter_catalog_local.sqlite<br/>optional catalog refresh")]
   SQLITE -.-> FC["filter_catalog.json"]
+  MENU["filter_dp_investor_menu_catalog.json"]
+  FNDB["filter_dp_investor_menu()<br/>in remote + local PG"]
+
+  LOCAL --> FNDB
+  REMOTE -.-> FNDB
+  MENU -.-> LLM["Param LLM"]
 
   classDef db fill:#422006,stroke:#f59e0b,color:#fef3c7
-  class REMOTE,LOCAL db
+  class REMOTE,LOCAL,FNDB db
 </pre>
   </div>
   <p class="caption">
-    Subset clone (~14 tables) is enough for ARN-scoped chat; sparse <code>processed_trxns</code> on some
-    folios is expected. Docs: <code>backend/docs/local_docker_postgres.md</code>.
-    Security: ARN from session/config only · read-only SQL · banking / non-individual blocked.
+    The function must exist on the target database (deploy <code>planning/complete_function.sql</code>).
+    Subset clone (~14 contract tables) supports local dev; app runtime calls the function, not ad-hoc joins.
+    Docs: <code>backend/docs/local_docker_postgres.md</code>.
+    Security: ARN from session/config only · only <code>filter_dp_investor_menu</code> · no base-table SQL ·
+    banking / non-individual blocked.
   </p>
 </section>
 
@@ -357,8 +386,8 @@ flowchart TB
 <pre class="mermaid">
 flowchart TB
   subgraph REQ["Per investor question — variable"]
-    BR["Amazon Bedrock<br/>~80% of $ · Sonnet SQL gen"]
-    BR2["Haiku · root + router + repair"]
+    BR["Amazon Bedrock<br/>Param LLM + root Haiku"]
+    BR2["No module router / SQL gen / repair"]
   end
 
   subgraph FIX["Fixed / monthly infrastructure"]
@@ -396,15 +425,14 @@ flowchart TB
       </thead>
       <tbody>
         <tr><td>LLM</td><td>Root Haiku (tool choice + reply)</td><td>On-demand tokens</td><td class="num">~$0.001</td></tr>
-        <tr><td>LLM</td><td>Module router Haiku</td><td>On-demand tokens</td><td class="num">~$0.001</td></tr>
-        <tr><td>LLM</td><td>SQL generator Sonnet 3.5</td><td>~14k in → ~2k out</td><td class="num">~$0.07–0.08</td></tr>
-        <tr><td>LLM</td><td>Validation / execute repair (optional)</td><td>+Haiku / +Sonnet</td><td class="num">+$0.00–0.09</td></tr>
+        <tr><td>LLM</td><td>Menu param LLM (Sonnet or Haiku via config)</td><td>~2–4k in → ~0.5k out</td><td class="num">~$0.01–0.04</td></tr>
+        <tr><td>LLM</td><td>Heuristic unsupported (no LLM)</td><td>Regex only</td><td class="num">$0</td></tr>
         <tr><td>Compute</td><td>FastAPI worker (shared host)</td><td>Amortized CPU/RAM</td><td class="num">~$0.0001</td></tr>
-        <tr><td>Database</td><td>PostgreSQL read query</td><td>Shared warehouse / pool</td><td class="num">~$0</td></tr>
+        <tr><td>Database</td><td><code>filter_dp_investor_menu()</code> RPC</td><td>Shared warehouse / pool</td><td class="num">~$0</td></tr>
         <tr><td>Network</td><td>VPN / private link to DB</td><td>Usually existing</td><td class="num">~$0</td></tr>
-        <tr class="total"><td colspan="3"><strong>Investor SQL — happy path total</strong></td><td class="num"><strong>~$0.08–0.10</strong></td></tr>
+        <tr class="total"><td colspan="3"><strong>Investor search — happy path total</strong></td><td class="num"><strong>~$0.02–0.05</strong></td></tr>
         <tr><td colspan="3">Greeting only (root Haiku)</td><td class="num">~$0.001</td></tr>
-        <tr><td colspan="3">Worst case (both repairs)</td><td class="num">~$0.17–0.20</td></tr>
+        <tr><td colspan="3"><code>out_of_scope</code> (heuristic, no DB)</td><td class="num">~$0.001</td></tr>
       </tbody>
     </table>
 
@@ -456,11 +484,11 @@ flowchart TB
         </tr>
       </thead>
       <tbody>
-        <tr><td>100 questions</td><td class="num">~$9</td><td class="num">~$100</td><td class="num"><strong>~$110</strong></td></tr>
-        <tr><td>1,000</td><td class="num">~$90</td><td class="num">~$100</td><td class="num"><strong>~$190</strong></td></tr>
-        <tr><td>10,000</td><td class="num">~$900</td><td class="num">~$150</td><td class="num"><strong>~$1,050</strong></td></tr>
-        <tr><td>100,000</td><td class="num">~$9,000</td><td class="num">~$300</td><td class="num"><strong>~$9,300</strong></td></tr>
-        <tr><td>1,000,000</td><td class="num">~$90,000</td><td class="num">~$500</td><td class="num"><strong>~$90,500</strong></td></tr>
+        <tr><td>100 questions</td><td class="num">~$3</td><td class="num">~$100</td><td class="num"><strong>~$103</strong></td></tr>
+        <tr><td>1,000</td><td class="num">~$30</td><td class="num">~$100</td><td class="num"><strong>~$130</strong></td></tr>
+        <tr><td>10,000</td><td class="num">~$300</td><td class="num">~$150</td><td class="num"><strong>~$450</strong></td></tr>
+        <tr><td>100,000</td><td class="num">~$3,000</td><td class="num">~$300</td><td class="num"><strong>~$3,300</strong></td></tr>
+        <tr><td>1,000,000</td><td class="num">~$30,000</td><td class="num">~$500</td><td class="num"><strong>~$30,500</strong></td></tr>
       </tbody>
     </table>
 
@@ -468,38 +496,42 @@ flowchart TB
     <table class="cost">
       <thead><tr><th>Lever</th><th>Effect</th><th>Trade-off</th></tr></thead>
       <tbody>
-        <tr><td><code>BEDROCK_QUERY_GENERATOR_MODEL_ID</code> → Nova Pro / Haiku</td><td>LLM −70–75%</td><td>SQL quality — test before prod</td></tr>
-        <tr><td><code>QUERY_GENERATOR_MODULE_ROUTER_LLM=false</code></td><td>LLM −5–10%</td><td>Keyword module routing only</td></tr>
-        <tr><td>Lower <code>QUERY_GENERATOR_MODULAR_GUIDE_MAX_CHARS</code></td><td>LLM −5–15%</td><td>May miss join hints</td></tr>
-        <tr><td>Shared warehouse vs new RDS clone</td><td>Infra −$50–500/mo</td><td>Depends on DBA / network policy</td></tr>
-        <tr><td>Local Docker subset clone</td><td>Dev infra $0</td><td>Sparse facts (e.g. redemptions) on some folios</td></tr>
+        <tr><td><code>QUERY_GENERATOR_LLM_MODEL</code> → Haiku</td><td>LLM −60–80% vs Sonnet</td><td>Test param mapping quality</td></tr>
+        <tr><td>Heuristic <code>detect_unsupported_question</code></td><td>Saves param LLM on obvious OOS</td><td>Keep patterns updated</td></tr>
+        <tr><td>Shared warehouse vs new RDS clone</td><td>Infra −$50–500/mo</td><td>Function must exist on DB</td></tr>
+        <tr><td>Local Docker subset clone</td><td>Dev infra $0</td><td>Deploy function + contract tables locally</td></tr>
       </tbody>
     </table>
 
     <p class="note">
       Infra rows are <strong>order-of-magnitude</strong> for capacity planning (ap-south-1–style single
       app deployment), not invoices. At low volume, <strong>fixed infra</strong> can exceed LLM; above
-      ~2k investor questions/month, <strong>Bedrock dominates</strong>. Legacy SearchPlan path was
-      ~$0.02–0.05/question (Haiku-only, no Sonnet) — see appendix.
+      At low volume, <strong>fixed infra</strong> can exceed LLM; function-only path is much cheaper than
+      retired catalog-SQL (no Sonnet SQL gen, module router, or repair loops). See appendix for removed path.
     </p>
   </div>
 </section>
 
 <details>
-  <summary>Appendix — Legacy SearchPlan path (not on root agent)</summary>
+  <summary>Appendix — Retired catalog-SQL path (not in production)</summary>
   <div class="diagram" style="margin-top:0.75rem">
 <pre class="mermaid">
 flowchart LR
-  NL["Natural language"] --> SP["SearchPlan LLM"]
-  SP --> FN["filter_dp_investor_menu()"]
-  FN --> PG[(PostgreSQL)]
+  NL["Natural language"] --> RTR["Module router Haiku"]
+  RTR --> GUIDE["schema_guide_modules"]
+  GUIDE --> GEN["SQL generator Sonnet"]
+  GEN --> G["sql_guard"]
+  G --> EX["catalog_sql_executor"]
+  EX --> PG[(PostgreSQL tables)]
   classDef legacy fill:#1e293b,stroke:#64748b,color:#cbd5e1
-  class NL,SP,FN legacy
+  class NL,RTR,GUIDE,GEN,G,EX legacy
 </pre>
   </div>
   <p class="caption">
-    Legacy code remains under <code>individual_executor</code>, <code>search_plan_builder</code>, etc.
-    Production path is schema-guide + catalog SQL (diagrams above).
+    Removed from production: modular schema guide + LLM-written <code>SELECT</code> on warehouse tables
+    (<code>query_flow_router.py</code>, <code>schema_guide_modules/</code>, validation/execute repair).
+    <strong>Current production</strong> is §3 — parameters → <code>filter_dp_investor_menu</code> only.
+    Reference SQL for the function: <code>planning/complete_function.sql</code>.
   </p>
 </details>
 

@@ -53,8 +53,8 @@ root_agent = Agent(
     model=config.llm.model,  # small/fast Bedrock model (BEDROCK_MODEL_ID / BEDROCK_ROOT_MODEL_ID)
     name="investor_search_agent",
     description=(
-        "Distributor investor assistant. For investor data questions call "
-        "generate_catalog_sql_query_tool (or detect_intent_tool, which runs the same SQL path). "
+        "Distributor Individual investor assistant. For list/filter questions call "
+        "generate_catalog_sql_query_tool (filter_dp_investor_menu) or detect_intent_tool. "
         "Use greeting_tool only for hi/thanks."
     ),
     instruction=build_root_agent_instruction(),

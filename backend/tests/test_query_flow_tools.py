@@ -1,4 +1,4 @@
-"""Unit tests for ``generate_catalog_sql_query_tool`` (mocked LLM)."""
+"""Unit tests for ``generate_catalog_sql_query_tool`` (mocked menu-param LLM)."""
 
 from __future__ import annotations
 
@@ -41,24 +41,36 @@ def test_generate_catalog_sql_query_tool_returns_sql_only(monkeypatch: pytest.Mo
     get_config.cache_clear()
     monkeypatch.setenv("CATALOG_SQL_EXECUTE_ENABLED", "false")
     trusted = _get_config().search.default_dev_arn
-    safe_sql = (
-        "SELECT 1 AS one FROM public.distributor_investor_mapping WHERE arn_code = %s LIMIT 1"
+    llm_payload = json.dumps(
+        {
+            "thought": "default list",
+            "eligibility": "ALL",
+            "otm": "ALL",
+            "investor_type": "ALL",
+            "investor_subtypes": [],
+            "holding": None,
+            "systematic": None,
+            "activity": None,
+            "searchtext": None,
+            "sortkey": "first_name",
+            "sortvalue": "ASC",
+            "page_limit": 25,
+            "page_index": 0,
+            "allowbroker": "Y",
+            "unsupported_reason": None,
+        }
     )
-    payload = json.dumps({"thought": "unit", "sql": safe_sql, "parameters": [trusted]})
 
-    monkeypatch.setattr(litellm, "completion", lambda **kwargs: _choice(payload))
+    monkeypatch.setattr(litellm, "completion", lambda **kwargs: _choice(llm_payload))
 
     ctx = _ToolCtx()
-    out = generate_catalog_sql_query_tool("count investors", ctx)
+    out = generate_catalog_sql_query_tool("show my investors", ctx)
     assert out["status"] == "ok"
-    assert out["sql"] == safe_sql
+    assert "filter_dp_investor_menu" in (out.get("sql") or "")
     assert out["executed"] is False
     reply = out.get("reply") or ""
     assert "not executed" in reply.lower() or "execution disabled" in reply.lower()
-    assert trusted in reply or "ARN-" in reply
-    assert ctx.state[STATE_KEY_QUERY_GENERATOR_LAST].get("parsed_sql") == safe_sql
     fq = ctx.state[STATE_KEY_FINAL_QUERY]
-    assert fq.get("engine") == "catalog_sql_generator"
-    assert fq.get("sql") == safe_sql
+    assert fq.get("engine") == "filter_dp_investor_menu"
     trace = ctx.state[STATE_KEY_QUERY_FLOW_TRACE]
-    assert isinstance(trace, list) and trace[-1].get("phase") == "catalog_sql_generator"
+    assert isinstance(trace, list) and trace[-1].get("phase") == "filter_dp_investor_menu_params"

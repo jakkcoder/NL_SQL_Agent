@@ -1,4 +1,4 @@
-"""Example NL strings: ``generate_catalog_sql_query_tool`` persists final SQL in session state."""
+"""Example NL strings: ``generate_catalog_sql_query_tool`` → ``filter_dp_investor_menu``."""
 
 from __future__ import annotations
 
@@ -23,18 +23,17 @@ class _FakeToolContext:
         self.state = state or {}
 
 
+# Portal-supported examples (see planning/Investor_Filter_Query_Mapping - Individual Investors.csv)
 EXAMPLE_QUERIES: list[str] = [
-    "Show my investors in Mumbai",
-    "Investor with Age between 30 and 40",
-    "Investors who did redemption in last quarter for equity funds.",
-    "Active SIPs above 5,000 per month in hybrid funds.",
-    "Dormant / inactive investors (investors not transacted in certain period / having 0 units across all schemes)",
-    "Top 20 investors by purchases in FY25",
-    "Investors named 'Bhavin' in Mumbai or Ahmedabad.",
-    "NRI investors",
-    "Minor Investors not invested in CGF schemes",
-    "Investors with no active SIP",
-    "Investors with investment only in Liquid / cash funds",
+    "Show my investors",
+    "Show eligible investors",
+    "Show investors with OTM",
+    "Show active investors",
+    "Show dormant investors",
+    "Show minor investors",
+    "Show investors with active SIP",
+    "Who redeemed recently",
+    "Find investor named Bhavin",
 ]
 
 
@@ -48,25 +47,44 @@ def _choice(content: str) -> MagicMock:
     return resp
 
 
-@pytest.fixture
-def stub_catalog_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Return a minimal valid SQL proposal for every catalog-generator LLM call."""
+def _default_menu_params_json() -> str:
+    return json.dumps(
+        {
+            "thought": "stub",
+            "eligibility": "ALL",
+            "otm": "ALL",
+            "investor_type": "ALL",
+            "investor_subtypes": [],
+            "holding": None,
+            "systematic": None,
+            "activity": None,
+            "searchtext": None,
+            "sortkey": "first_name",
+            "sortvalue": "ASC",
+            "page_limit": 25,
+            "page_index": 0,
+            "allowbroker": "Y",
+            "unsupported_reason": None,
+        }
+    )
 
+
+@pytest.fixture
+def stub_menu_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     import litellm
 
-    trusted = get_config().search.default_dev_arn
-    safe_sql = "SELECT 1 AS one FROM public.investor i WHERE i.arn_code = %s LIMIT 1"
-
-    def _completion(**kwargs):
-        payload = json.dumps({"thought": "stub", "sql": safe_sql, "parameters": [trusted]})
-        return _choice(payload)
-
-    monkeypatch.setattr(litellm, "completion", _completion)
+    get_config.cache_clear()
+    monkeypatch.setenv("CATALOG_SQL_EXECUTE_ENABLED", "false")
+    monkeypatch.setattr(
+        litellm,
+        "completion",
+        lambda **kwargs: _choice(_default_menu_params_json()),
+    )
 
 
 @pytest.mark.parametrize("query", EXAMPLE_QUERIES)
 def test_generate_catalog_sql_tool_stores_final_query_in_state(
-    stub_catalog_llm: None,
+    stub_menu_llm: None,
     query: str,
 ) -> None:
     tool_context = _FakeToolContext()
@@ -75,14 +93,13 @@ def test_generate_catalog_sql_tool_stores_final_query_in_state(
     assert out["status"] == "ok", out
     assert STATE_KEY_FINAL_QUERY in tool_context.state
     fq = tool_context.state[STATE_KEY_FINAL_QUERY]
-    assert fq.get("engine") == "catalog_sql_generator"
+    assert fq.get("engine") == "filter_dp_investor_menu"
     sql = fq.get("sql")
-    assert isinstance(sql, str) and "SELECT" in sql
+    assert isinstance(sql, str) and "filter_dp_investor_menu" in sql
     params = fq.get("parameters")
     assert isinstance(params, list)
 
     sql_pg = fq.get("sql_postgresql")
-    assert isinstance(sql_pg, str) and "SELECT" in sql_pg
-    assert "%s" not in sql_pg
+    assert isinstance(sql_pg, str) and "filter_dp_investor_menu" in sql_pg
     assert tool_context.state.get(STATE_KEY_LAST_SQL) == sql_pg
     assert tool_context.state.get(STATE_KEY_LAST_SQL_PARAMETERS) == params

@@ -20,27 +20,25 @@ from app.models.agent_state import (
     RoutingIntent,
     RoutingRoute,
     STATE_KEY_FINAL_QUERY,
+    STATE_KEY_LAST_SQL,
+    STATE_KEY_LAST_SQL_PARAMETERS,
     STATE_KEY_QUERY_FLOW_TRACE,
     STATE_KEY_QUERY_GENERATOR_LAST,
 )
 from app.services.arn_scope_guard import arn_scope_block_reason
-from app.services.catalog_sql_executor import (
-    CatalogSqlExecuteError,
-    dedupe_investor_result_rows,
-    execute_catalog_sql_readonly,
-    is_execute_timeout_error,
-)
 from app.services.final_query import publish_final_query_to_session
-from app.services.schema_contract_guide import load_schema_guide
-from app.services.catalog_sql_validation_repair import run_catalog_sql_validation_repair_llm
-from app.services.query_flow_router import CatalogSqlGeneratorTurn, run_catalog_sql_generator_llm
-from app.services.sql_guard import (
-    SqlGuardError,
-    normalize_catalog_sql_parameters,
-    sanitize_catalog_sql,
-    validate_arn_first_parameter,
-    validate_dynamic_sql,
+from app.services.catalog_sql_executor import CatalogSqlExecuteError, is_execute_timeout_error
+from app.services.dp_investor_menu import (
+    build_filter_dp_investor_menu_sql,
+    execute_filter_dp_investor_menu,
+    validate_filter_dp_investor_menu_sql,
 )
+from app.services.dp_investor_menu_llm import run_dp_investor_menu_param_llm
+from app.services.investor_capability import (
+    build_unsupported_capability_reply,
+    detect_unsupported_question,
+)
+from app.services.sql_guard import SqlGuardError
 from app.services.filter_detection import message_has_search_filters
 from app.services.routing import (
     classify_message,
@@ -109,6 +107,35 @@ def _format_sql_tool_reply(
     return "\n".join(parts)
 
 
+def _unsupported_capability_output(
+    *,
+    question: str,
+    detail: str | None,
+    gen_model: str,
+    tool_context: ToolContext,
+) -> dict[str, Any]:
+    """No SQL, no session query — capability boundary only."""
+
+    reply = build_unsupported_capability_reply(detail)
+    log = {
+        "phase": "filter_dp_investor_menu_unsupported",
+        "question": question,
+        "unsupported_reason": detail,
+    }
+    tool_context.state[STATE_KEY_QUERY_GENERATOR_LAST] = log
+    _append_query_flow_trace(tool_context.state, dict(log))
+    tool_context.state.pop(STATE_KEY_FINAL_QUERY, None)
+    tool_context.state.pop(STATE_KEY_LAST_SQL, None)
+    tool_context.state.pop(STATE_KEY_LAST_SQL_PARAMETERS, None)
+    return _dump_model(
+        GenerateCatalogSqlToolOutput(
+            status="out_of_scope",
+            reply=reply,
+            generator_model=gen_model,
+        )
+    )
+
+
 def _publish_sql_to_session(
     session_state: dict[str, Any],
     *,
@@ -121,7 +148,7 @@ def _publish_sql_to_session(
 
     safe_params = _json_safe(list(parameters))
     payload = {
-        "engine": "catalog_sql_generator",
+        "engine": "filter_dp_investor_menu",
         "sql": sql.strip(),
         "sql_postgresql": build_postgresql_executable_sql(sql, safe_params),
         "parameters": safe_params,
@@ -135,88 +162,13 @@ def _publish_sql_to_session(
     return payload
 
 
-def _generate_sql_turn(
-    *,
-    question: str,
-    trusted_arn: str,
-    schema_contract: dict[str, Any],
-    config: AppConfig,
-    repair_context: dict[str, Any] | None,
-) -> tuple[CatalogSqlGeneratorTurn, dict[str, Any]]:
-    return run_catalog_sql_generator_llm(
-        question=question,
-        trusted_arn=trusted_arn,
-        schema_contract=schema_contract,
-        schema_contract_max_chars=config.query_generator_schema_contract_max_chars,
-        guide_only=True,
-        repair_context=repair_context,
-    )
-
-
-def _validate_turn(sql: str, params: list[Any], trusted_arn: str) -> str | None:
-    try:
-        validate_dynamic_sql(sql)
-        validate_arn_first_parameter(sql, params, trusted_arn)
-        return None
-    except SqlGuardError as exc:
-        return str(exc)
-
-
-def _hygiene_catalog_sql_turn(
-    turn: CatalogSqlGeneratorTurn, trusted_arn: str
-) -> CatalogSqlGeneratorTurn:
-    sql = sanitize_catalog_sql(turn.sql)
-    return turn.model_copy(
-        update={
-            "sql": sql,
-            "parameters": normalize_catalog_sql_parameters(
-                sql, list(turn.parameters), trusted_arn
-            ),
-        }
-    )
-
-
-def _try_validation_repair_turn(
-    *,
-    turn: CatalogSqlGeneratorTurn,
-    question: str,
-    trusted_arn: str,
-    validation_error: str,
-    config: AppConfig,
-    tool_context: ToolContext,
-    timing_ms: dict[str, int],
-) -> tuple[CatalogSqlGeneratorTurn, str | None, bool]:
-    """Run small LLM repair when static validation fails; return (turn, error, repair_used)."""
-
-    if not config.catalog_sql_validation_repair_enabled:
-        return turn, validation_error, False
-
-    try:
-        t0 = time.perf_counter()
-        repaired, repair_log = run_catalog_sql_validation_repair_llm(
-            question=question,
-            trusted_arn=trusted_arn,
-            failed_sql=turn.sql,
-            failed_parameters=_json_safe(list(turn.parameters)),
-            validation_error=validation_error,
-        )
-        timing_ms["validation_repair"] = int((time.perf_counter() - t0) * 1000)
-        repair_log["timing_ms"] = dict(timing_ms)
-        tool_context.state[STATE_KEY_QUERY_GENERATOR_LAST] = repair_log
-        _append_query_flow_trace(tool_context.state, dict(repair_log))
-        repaired = _hygiene_catalog_sql_turn(repaired, trusted_arn)
-        err = _validate_turn(repaired.sql, list(repaired.parameters), trusted_arn)
-        return repaired, err, True
-    except Exception as exc:
-        logger.warning("catalog SQL validation repair failed: %s", exc)
-        return turn, validation_error, True
-
-
 def generate_catalog_sql_query_tool(question: str, tool_context: ToolContext) -> dict[str, Any]:
-    """Generate PostgreSQL from schema guide, execute once, retry LLM once on execution failure."""
+    """Map NL to ``public.filter_dp_investor_menu`` only; never query base tables directly."""
 
     config = get_config()
     trusted_arn = config.search.default_dev_arn
+    gen_model = config.query_generator_llm_model_resolved
+
     scope_msg = arn_scope_block_reason(
         user_query=question,
         tool_arn_arg=None,
@@ -227,56 +179,47 @@ def generate_catalog_sql_query_tool(question: str, tool_context: ToolContext) ->
             GenerateCatalogSqlToolOutput(
                 status="blocked",
                 reply=scope_msg,
-                generator_model=config.query_generator_llm_model_resolved,
+                generator_model=gen_model,
             )
         )
 
-    schema_contract = load_schema_guide()
-    if not schema_contract:
-        return _dump_model(
-            GenerateCatalogSqlToolOutput(
-                status="error",
-                reply=(
-                    "Investor schema contract is not available. "
-                    "Ensure backend/app/data/investor_db_schema_guide.json exists "
-                    "(run: python app/data/build_investor_schema_guide.py)."
-                ),
-                generator_model=config.query_generator_llm_model_resolved,
-            )
+    heuristic_reason = detect_unsupported_question(question)
+    if heuristic_reason:
+        return _unsupported_capability_output(
+            question=question,
+            detail=heuristic_reason,
+            gen_model=gen_model,
+            tool_context=tool_context,
         )
 
-    gen_model = config.query_generator_llm_model_resolved
-    sql_retry_used = False
+    timing_ms: dict[str, int] = {}
+    validation_error: str | None = None
     execute_error: str | None = None
     rows: list[dict[str, Any]] | None = None
     executed = False
-    timing_ms: dict[str, int] = {}
+    thought = ""
 
     t0 = time.perf_counter()
     try:
-        turn, gen_log = _generate_sql_turn(
+        menu_params, gen_log = run_dp_investor_menu_param_llm(
             question=question,
             trusted_arn=trusted_arn,
-            schema_contract=schema_contract,
-            config=config,
-            repair_context=None,
         )
     except Exception as exc:
         timing_ms["generate"] = int((time.perf_counter() - t0) * 1000)
         gen_log = {
-            "phase": "catalog_sql_generator",
+            "phase": "filter_dp_investor_menu_params",
             "error": str(exc),
             "question": question,
             "timing_ms": timing_ms,
         }
         tool_context.state[STATE_KEY_QUERY_GENERATOR_LAST] = gen_log
         _append_query_flow_trace(tool_context.state, dict(gen_log))
-        return _dump_model(
-            GenerateCatalogSqlToolOutput(
-                status="error",
-                reply=f"Catalog SQL generator failed: {exc}",
-                generator_model=gen_model,
-            )
+        return _unsupported_capability_output(
+            question=question,
+            detail=str(exc),
+            gen_model=gen_model,
+            tool_context=tool_context,
         )
 
     timing_ms["generate"] = int((time.perf_counter() - t0) * 1000)
@@ -285,140 +228,84 @@ def generate_catalog_sql_query_tool(question: str, tool_context: ToolContext) ->
     _append_query_flow_trace(tool_context.state, dict(gen_log))
     gen_model = str(gen_log.get("model") or gen_model)
 
-    turn = _hygiene_catalog_sql_turn(turn, trusted_arn)
-    params = list(turn.parameters)
-    validation_error = _validate_turn(turn.sql, params, trusted_arn)
-    validation_repair_used = False
-    if validation_error:
-        turn, validation_error, validation_repair_used = _try_validation_repair_turn(
-            turn=turn,
+    if menu_params.unsupported_reason:
+        return _unsupported_capability_output(
             question=question,
-            trusted_arn=trusted_arn,
-            validation_error=validation_error,
-            config=config,
+            detail=menu_params.unsupported_reason,
+            gen_model=gen_model,
             tool_context=tool_context,
-            timing_ms=timing_ms,
-        )
-        params = list(turn.parameters)
-    if validation_error:
-        _publish_sql_to_session(tool_context.state, question=question, sql=turn.sql, parameters=params)
-        repair_note = (
-            " (A small validation-repair model was tried but could not fix the SQL.)"
-            if validation_repair_used
-            else ""
-        )
-        return _dump_model(
-            GenerateCatalogSqlToolOutput(
-                status="error",
-                reply=(
-                    f"Generated SQL failed validation: {validation_error}{repair_note}\n\n"
-                    f"SQL:\n{turn.sql.strip()}"
-                ),
-                thought=turn.thought,
-                sql=turn.sql,
-                parameters=params,
-                generator_model=gen_model,
-                validation_error=validation_error,
-            )
         )
 
-    max_retries = max(0, int(config.catalog_sql_max_retries_on_execute_error))
-    attempt = 0
-    while True:
-        if config.catalog_sql_execute_enabled and config.database_url_value:
-            t_exec = time.perf_counter()
-            try:
-                rows = dedupe_investor_result_rows(
-                    execute_catalog_sql_readonly(
-                        turn.sql, params, trusted_arn=trusted_arn, config=config
-                    )
-                )
-                timing_ms["execute"] = int((time.perf_counter() - t_exec) * 1000)
-                executed = True
-                execute_error = None
-                break
-            except CatalogSqlExecuteError as exc:
-                timing_ms["execute"] = int((time.perf_counter() - t_exec) * 1000)
-                execute_error = str(exc)
-                skip_repair = config.catalog_sql_skip_repair_on_timeout and is_execute_timeout_error(
-                    execute_error
-                )
-                if attempt >= max_retries or skip_repair:
-                    break
-                sql_retry_used = True
-                failed_sql = turn.sql.strip()
-                if len(failed_sql) > 8000:
-                    failed_sql = failed_sql[:8000] + "\n-- …(truncated for repair prompt)\n"
-                repair = {
-                    "failed_sql": failed_sql,
-                    "failed_parameters": _json_safe(params),
-                    "database_error": execute_error,
-                    "attempt": attempt + 1,
-                }
-                try:
-                    t_repair = time.perf_counter()
-                    turn, repair_log = _generate_sql_turn(
-                        question=question,
-                        trusted_arn=trusted_arn,
-                        schema_contract=schema_contract,
-                        config=config,
-                        repair_context=repair,
-                    )
-                    timing_ms["repair_generate"] = int((time.perf_counter() - t_repair) * 1000)
-                    repair_log["timing_ms"] = dict(timing_ms)
-                    tool_context.state[STATE_KEY_QUERY_GENERATOR_LAST] = repair_log
-                    _append_query_flow_trace(tool_context.state, dict(repair_log))
-                    params = list(turn.parameters)
-                    validation_error = _validate_turn(turn.sql, params, trusted_arn)
-                    if validation_error:
-                        execute_error = f"Repair SQL failed validation: {validation_error}"
-                        break
-                except Exception as exc:
-                    execute_error = f"SQL repair LLM failed: {exc}"
-                    break
-                attempt += 1
-        else:
-            break
+    thought = menu_params.thought
+
+    try:
+        sql, params = build_filter_dp_investor_menu_sql(menu_params, trusted_arn=trusted_arn)
+        validate_filter_dp_investor_menu_sql(sql, params, trusted_arn)
+    except (SqlGuardError, ValueError) as exc:
+        validation_error = str(exc)
+        return _unsupported_capability_output(
+            question=question,
+            detail=validation_error,
+            gen_model=gen_model,
+            tool_context=tool_context,
+        )
+
+    if config.catalog_sql_execute_enabled and config.database_url_value:
+        t_exec = time.perf_counter()
+        try:
+            rows = execute_filter_dp_investor_menu(
+                sql, params, trusted_arn=trusted_arn, config=config
+            )
+            timing_ms["execute"] = int((time.perf_counter() - t_exec) * 1000)
+            executed = True
+        except CatalogSqlExecuteError as exc:
+            timing_ms["execute"] = int((time.perf_counter() - t_exec) * 1000)
+            execute_error = str(exc)
+            gen_log["execute_error"] = execute_error
+            tool_context.state[STATE_KEY_QUERY_GENERATOR_LAST] = gen_log
 
     fq = _publish_sql_to_session(
         tool_context.state,
         question=question,
-        sql=turn.sql,
+        sql=sql,
         parameters=params,
         rows=rows,
     )
     display_rows = (rows or [])[: config.catalog_sql_max_display_rows]
     row_count = len(rows) if rows else 0
     reply = _format_sql_tool_reply(
-        turn.sql,
+        sql,
         params,
-        turn.thought,
+        thought,
         sql_postgresql=fq.get("sql_postgresql"),
         rows=rows,
         executed=executed,
         execute_error=execute_error if not executed else None,
-        sql_retry_used=sql_retry_used,
+        sql_retry_used=False,
         max_display_rows=config.catalog_sql_max_display_rows,
     )
 
     status = "ok" if executed or not config.catalog_sql_execute_enabled else "error"
-    if validation_error:
+    if execute_error and not executed:
         status = "error"
-    elif execute_error and not executed:
-        status = "error"
+        reply = (
+            "I used only the approved ``filter_dp_investor_menu`` function, but execution failed.\n\n"
+            f"Details: {execute_error}\n\n"
+            "Please verify database connectivity and try again."
+        )
 
     return _dump_model(
         GenerateCatalogSqlToolOutput(
             status=status,
             reply=reply,
-            thought=turn.thought,
-            sql=turn.sql,
+            thought=thought,
+            sql=sql,
             parameters=params,
             row_count=row_count,
             count=row_count,
             rows=display_rows,
             executed=executed,
-            sql_retry_used=sql_retry_used,
+            sql_retry_used=False,
             generator_model=gen_model,
             validation_error=validation_error,
             execute_error=execute_error if not executed else None,

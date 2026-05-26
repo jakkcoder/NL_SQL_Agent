@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "function": "public.filter_dp_investor_menu",
+  "description": "Deterministic Individual investor list for the distributor portal. Maps NL + UI filters to a single Postgres function call (see planning/complete_function.sql).",
+  "unsupported_in_function": [
+    "city / geography-only filters (not in filter_dp_investor_menu)",
+    "age or date-of-birth ranges",
+    "ad-hoc raw SQL or direct queries on base tables (never used)",
+    "scheme-type / equity / hybrid / liquid / top-N / FY analytics",
+    "PAN / folio / mobile / email lookup",
+    "NRI-only filters",
+    "Non-Individual investors"
+  ],
+  "unsupported_user_message": "Standard reply: not available in current model capability; future version planned. No SQL is executed.",
+  "defaults": {
+    "eligibility": "ALL",
+    "otm": "ALL",
+    "investor_type": "ALL",
+    "investor_subtypes": [],
+    "holding": null,
+    "systematic": null,
+    "activity": null,
+    "searchtext": null,
+    "sortkey": "first_name",
+    "sortvalue": "ASC",
+    "page_limit": 25,
+    "page_index": 0,
+    "allowbroker": "Y"
+  },
+  "parameters": {
+    "arncode": { "type": "varchar", "source": "session", "notes": "Always session ARN; never from user text." },
+    "eligibility": { "values": ["ALL", "YES", "NO"], "portal": "Eligibility filter" },
+    "otm": { "values": ["ALL", "Y", "NOT_AVAILABLE"], "portal": "OTM / mandate" },
+    "investortype": { "values": ["ALL", "ACTIVE", "DORMANT"], "portal": "Active vs dormant" },
+    "investorsubtype": { "values": ["CGF", "MINOR", "OTHERS"], "type": "text[]", "portal": "Investor subtype chips" },
+    "holding": {
+      "type": "current_holdings",
+      "fields": {
+        "is_holding": ["ALL", "WITH", "WITHOUT"],
+        "schemes": ["ALL or scheme codes"],
+        "inv_options": ["Z", "N", "Y", "ALL"]
+      },
+      "portal": "Current holdings filter panel"
+    },
+    "systematic": {
+      "type": "systematic_plan",
+      "fields": {
+        "is_active": ["ALL", "WITH", "WITHOUT"],
+        "plan": ["SIP", "STP", "SWP", "FLEXSTP", "FLEXINDEX", "DTP", "SWINGSTP", "SMARTSWAP", "FLEXSIP"],
+        "schemes": ["ALL or scheme codes"],
+        "inv_options": ["Z", "N", "Y", "ALL"]
+      },
+      "portal": "Systematic plans filter panel"
+    },
+    "activity": {
+      "type": "investor_activity",
+      "fields": {
+        "have": ["ALL", "WITH", "WITHOUT"],
+        "activity_type": ["PURCHASE", "SWITCH", "REDEMPTION", "SIP", "DTP", "STP", "SWP", "FLEXSIP"],
+        "schemes": ["ALL or scheme codes"],
+        "inv_options": ["Z", "N", "Y", "ALL"],
+        "duration": ["1 month", "2 month", "3 month", "6 month", "1 year", "2 year", "3 year", "this financial year"]
+      },
+      "portal": "Investor activity filter panel"
+    },
+    "searchtext": { "type": "varchar", "notes": "Name search only; use %name% pattern for ILIKE on first_name." },
+    "sortkey": { "values": ["first_name", "pan_number", "dob"] },
+    "sortvalue": { "values": ["ASC", "DESC"] },
+    "pagelimit": { "type": "int", "default": 25 },
+    "pageindex": { "type": "int", "default": 0 },
+    "allowbroker": { "values": ["Y"], "default": "Y" }
+  },
+  "examples": [
+    {
+      "nl": "Show me my investors",
+      "call": "default — eligibility/otm/type ALL, empty subtype, holding/systematic/activity null"
+    },
+    {
+      "nl": "Show eligible investors / with email",
+      "eligibility": "YES"
+    },
+    {
+      "nl": "Show investors with OTM",
+      "otm": "Y"
+    },
+    {
+      "nl": "Active investors",
+      "investortype": "ACTIVE"
+    },
+    {
+      "nl": "Dormant investors",
+      "investortype": "DORMANT"
+    },
+    {
+      "nl": "Minor investors",
+      "investorsubtype": ["MINOR"]
+    },
+    {
+      "nl": "Investors with active SIP",
+      "systematic": { "mode": "WITH", "plan": ["SIP"] }
+    },
+    {
+      "nl": "Recent redemption",
+      "activity": { "mode": "WITH", "activity_type": ["REDEMPTION"], "duration": "1 month" }
+    },
+    {
+      "nl": "Find investor named Rahul",
+      "searchtext": "%rahul%"
+    }
+  ]
+}

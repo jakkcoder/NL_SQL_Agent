@@ -4,7 +4,7 @@ Local/dev-first MVP for a mutual fund distributor **Individual investor** search
 
 The backend uses Google ADK for the agent and keeps SQL execution deterministic:
 
-- Individual investors: **`generate_catalog_sql_query_tool`** loads modular schema guides from `backend/app/data/schema_guide_modules/`, calls a catalog SQL generator LLM, validates SQL, and executes read-only PostgreSQL against the warehouse (ARN-scoped).
+- **Individual investors:** **`generate_catalog_sql_query_tool`** maps natural language to parameters for the warehouse function **`public.filter_dp_investor_menu`** (portal-aligned filters; see `planning/complete_function.sql` and `app/data/filter_dp_investor_menu_catalog.json`), then executes `SELECT * FROM public.filter_dp_investor_menu(...)`.
 - Non-Individual investor search is **not** in this MVP.
 - Out of scope: pending investors, PAN/folio/mobile/email lookup, flexible duration phrases (unless enabled as above for contract-grounded reporting only).
 

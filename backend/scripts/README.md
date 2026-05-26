@@ -13,7 +13,7 @@ Run from `backend/` with `export PYTHONPATH=.` (and `source .venv/bin/activate`)
 | **refresh_filter_catalog.py** | Refresh `app/data/filter_catalog.json` from DB distinct values. |
 | **init_dev_sqlite_demo.py** | Create tiny `app/data/dev_investor_demo.sqlite` for offline catalog dev. |
 | **build_schema_guide_modules.py** | Regenerate modular schema guide JSON under `app/data/schema_guide_modules/`. |
-| **verify_backend_queries.py** | Smoke-test ADK `/run` for benchmark NL questions (pass/fail; use `--verbose` for dumps). |
+| **verify_backend_queries.py** | Smoke-test ADK `/run` for benchmark NL questions against `filter_dp_investor_menu` (pass/fail; `--verbose` for dumps). |
 | **list_accessible_tables.sql** | Ad-hoc SQL helper (run in psql/pgAdmin). |
 
 **Data maintenance (under `app/data/`):**

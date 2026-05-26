@@ -30,12 +30,13 @@ STATE_KEY_TEMP_DETECTED_INTENT = "temp:detected_intent"
 STATE_KEY_TEMP_SHOULD_CALL_TOOL = "temp:should_call_tool"
 STATE_KEY_HAS_SEARCH_FILTERS = "has_search_filters"
 
-HDFC_GREETING_MESSAGE = (
-    "Hi, I am a chatbot from HDFC Mutual Fund. "
-    "I can help you search Individual investors. "
-    "Tell me what you are looking for—for example, show my investors, "
-    "investors with SIP, or active investors with OTM."
-)
+def _default_greeting_message() -> str:
+    from app.services.investor_capability import build_capability_greeting
+
+    return build_capability_greeting()
+
+
+HDFC_GREETING_MESSAGE = _default_greeting_message()
 
 NON_INDIVIDUAL_NOT_SUPPORTED = (
     "Non-Individual investor search is not available in this MVP. "
@@ -112,7 +113,7 @@ class IntentDetectionOutput(StrictSchemaModel):
 class GenerateCatalogSqlToolOutput(StrictSchemaModel):
     """Result of ``generate_catalog_sql_query_tool`` (generate, optional execute, optional one retry)."""
 
-    status: Literal["ok", "error", "blocked"] = "ok"
+    status: Literal["ok", "error", "blocked", "out_of_scope"] = "ok"
     reply: str
     thought: str | None = None
     sql: str | None = None

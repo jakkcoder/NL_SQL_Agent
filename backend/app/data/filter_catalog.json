@@ -1,5 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
+  "function": "public.filter_dp_investor_menu",
+  "function_notes": "Individual portal list uses this RPC only. Scalar args: arncode, eligibility, otm, investortype, investorsubtype[], searchtext, sortkey, sortvalue, pagelimit, pageindex, allowbroker. Composite: holding (current_holdings), systematic (systematic_plan), activity (investor_activity). See app/data/filter_dp_investor_menu_catalog.json and planning/complete_function.sql.",
   "source": "db+contract",
   "loaded_at": "2026-05-21T10:02:55.652754+00:00",
   "filters": {
@@ -18,7 +20,7 @@
         "YES",
         "NO"
       ],
-      "parameter": "individual_warehouse.eligibility",
+      "parameter": "filter_dp_investor_menu.eligibility",
       "source": "contract"
     },
     "individual_otm": {
@@ -27,7 +29,7 @@
         "Y",
         "NOT_AVAILABLE"
       ],
-      "parameter": "individual_warehouse.otm",
+      "parameter": "filter_dp_investor_menu.otm",
       "source": "contract"
     },
     "non_individual_otm": {
@@ -45,7 +47,7 @@
         "ACTIVE",
         "DORMANT"
       ],
-      "parameter": "individual_warehouse.investor_type",
+      "parameter": "filter_dp_investor_menu.investortype",
       "source": "contract"
     },
     "investor_subtypes": {
@@ -54,7 +56,7 @@
         "MINOR",
         "OTHERS"
       ],
-      "parameter": "individual_warehouse.investor_subtypes",
+      "parameter": "filter_dp_investor_menu.investorsubtype",
       "source": "contract"
     },
     "city": {
