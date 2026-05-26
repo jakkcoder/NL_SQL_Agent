@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""Smoke-test ADK /run for benchmark questions; print pass/fail per query."""
+"""Smoke-test ADK /run for benchmark NL questions.
+
+Default: pass/fail summary with optional SQL keyword checks.
+``--verbose``: dump session ``final_query``, ``last_sql``, and assistant reply per query.
+
+Usage (from backend/, server on :8000):
+  PYTHONPATH=. python scripts/verify_backend_queries.py
+  PYTHONPATH=. python scripts/verify_backend_queries.py --verbose
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
-import re
 import sys
 import time
 import urllib.error
@@ -125,6 +133,16 @@ def _sql_from_session(state: dict[str, Any]) -> str:
     return str(state.get("last_sql") or "")
 
 
+def _assistant_text_tail(events: list[dict[str, Any]], max_chars: int = 1200) -> str:
+    for ev in reversed(events):
+        parts = (ev.get("content") or {}).get("parts") or []
+        texts = [str(p["text"]) for p in parts if isinstance(p, dict) and p.get("text")]
+        if texts:
+            blob = "\n".join(texts).strip()
+            return blob[:max_chars] + ("\n…[truncated]" if len(blob) > max_chars else "")
+    return "(no assistant text in events)"
+
+
 def _check_sql(sql: str, keywords: list[str]) -> list[str]:
     low = sql.lower()
     missing = []
@@ -137,15 +155,50 @@ def _check_sql(sql: str, keywords: list[str]) -> list[str]:
     return missing
 
 
+def _print_verbose(state: dict[str, Any], events: list[dict[str, Any]]) -> None:
+    fq = state.get("final_query") or state.get("finalQuery")
+    last_sql = state.get("last_sql") or state.get("lastSql")
+    last_params = state.get("last_sql_parameters") or state.get("lastSqlParameters")
+
+    print("--- final_query ---")
+    print(json.dumps(fq, indent=2, default=str)[:4000] if fq else "(missing)")
+
+    print("\n--- last_sql ---")
+    if isinstance(last_sql, str):
+        print(last_sql[:2500] + ("…" if len(last_sql) > 2500 else ""))
+    else:
+        print(repr(last_sql))
+
+    if last_params is not None:
+        print("\n--- last_sql_parameters ---")
+        print(json.dumps(last_params, default=str)[:1500])
+
+    print("\n--- assistant reply ---")
+    print(_assistant_text_tail(events))
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Smoke-test catalog SQL via ADK /run.")
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print final_query, last_sql, and assistant text for each query.",
+    )
+    args = parser.parse_args()
+
     try:
         _get(f"{BASE}/health", 5)
     except Exception as exc:
         print(f"Backend not reachable at {BASE}: {exc}", file=sys.stderr)
+        print(
+            "Start: cd backend && export PYTHONPATH=. && "
+            "uvicorn app.main:app --host 127.0.0.1 --port 8000",
+            file=sys.stderr,
+        )
         return 1
 
     results: list[dict[str, Any]] = []
-    for i, (question, checks, sql_keywords) in enumerate(QUERIES, 1):
+    for i, (question, _checks, sql_keywords) in enumerate(QUERIES, 1):
         print(f"\n{'=' * 72}\n[{i}/{len(QUERIES)}] {question}\n{'=' * 72}")
         row: dict[str, Any] = {"question": question, "ok": False, "issues": []}
         t0 = time.perf_counter()
@@ -222,6 +275,10 @@ def main() -> int:
             print(f"  Reply: {row['reply_head']}…")
         for issue in row["issues"]:
             print(f"  ! {issue}")
+
+        if args.verbose:
+            _print_verbose(state, events)
+            print("-" * 72)
 
     passed = sum(1 for r in results if r.get("ok"))
     print(f"\n\nSUMMARY: {passed}/{len(results)} passed")

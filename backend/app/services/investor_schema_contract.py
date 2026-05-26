@@ -2,7 +2,7 @@
 
 Used by:
 - ``app/data/export_investor_schema_contract.py`` (refresh local JSON)
-- ``generate_catalog_sql_query_tool`` / ``ensure_session_search_artifacts`` (session snapshot)
+- ``schema_contract_for_sql_generator`` (catalog SQL generation)
 """
 
 from __future__ import annotations
@@ -16,12 +16,6 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
-
-from app.models.agent_state import (
-    STATE_KEY_INVESTOR_SCHEMA_CONTRACT_COMPACT,
-    STATE_KEY_INVESTOR_SCHEMA_CONTRACT_META,
-    STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -302,19 +296,6 @@ def load_packaged_schema_contract() -> dict[str, Any] | None:
         return None
 
 
-def schema_for_search_plan_llm(session_state: dict[str, Any] | None) -> dict[str, Any] | None:
-    """Prefer live session compact schema; else packaged file (compact)."""
-
-    session_state = session_state or {}
-    live = session_state.get(STATE_KEY_INVESTOR_SCHEMA_CONTRACT_COMPACT)
-    if isinstance(live, dict) and live.get("contract_kind") == "investor_schema_compact":
-        return live
-    packaged = load_packaged_schema_contract()
-    if packaged:
-        return compact_schema_contract(packaged)
-    return None
-
-
 def schema_contract_for_sql_generator(
     filter_catalog: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
@@ -360,66 +341,3 @@ def write_full_schema_contract_atomic(full: dict[str, Any], path: Path | None = 
             pass
         raise
     return target
-
-
-def _apply_packaged_fallback_to_session(session_state: dict[str, Any]) -> None:
-    packaged = load_packaged_schema_contract()
-    if packaged:
-        session_state[STATE_KEY_INVESTOR_SCHEMA_CONTRACT_COMPACT] = compact_schema_contract(packaged)
-        session_state[STATE_KEY_INVESTOR_SCHEMA_CONTRACT_META] = {
-            "source": "packaged_file",
-            "note": "Live DB unavailable or skipped; using investor_db_schema_contract.json",
-        }
-
-
-def ensure_investor_schema_for_search_session(
-    session_state: dict[str, Any],
-    database_url: str | None,
-) -> None:
-    """Once per session: load live schema (or packaged fallback), then skip later calls.
-
-    On successful live introspection, updates ``investor_db_schema_contract.json`` on disk
-    (skipped during pytest to avoid rewriting the repo file on every test).
-
-    Sets ``investor_schema_session_fetched`` so subsequent query generation in the same
-    session reuses cached compact schema without hitting the database again.
-    """
-
-    if session_state.get(STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED):
-        return
-
-    in_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
-
-    if not database_url:
-        _apply_packaged_fallback_to_session(session_state)
-        session_state[STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED] = True
-        return
-
-    if in_pytest:
-        _apply_packaged_fallback_to_session(session_state)
-        session_state[STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED] = True
-        return
-
-    try:
-        full = build_full_schema_contract(database_url)
-    except Exception as exc:
-        logger.warning("Live schema introspection failed, using packaged JSON: %s", exc)
-        _apply_packaged_fallback_to_session(session_state)
-        session_state[STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED] = True
-        return
-
-    issues = full.get("tables_missing_in_database") or []
-    compact = compact_schema_contract(full)
-    session_state[STATE_KEY_INVESTOR_SCHEMA_CONTRACT_COMPACT] = compact
-    session_state[STATE_KEY_INVESTOR_SCHEMA_CONTRACT_META] = {
-        "source": "live_auto",
-        "generated_at": full.get("generated_at"),
-        "tables_found": full.get("tables_found"),
-        "tables_missing_in_database": issues,
-    }
-    try:
-        write_full_schema_contract_atomic(full)
-    except OSError as exc:
-        logger.warning("Could not write investor_db_schema_contract.json: %s", exc)
-
-    session_state[STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED] = True

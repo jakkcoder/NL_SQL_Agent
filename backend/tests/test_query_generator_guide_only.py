@@ -44,13 +44,16 @@ def test_guide_only_payload_keys() -> None:
         )
 
     payload = json.loads(captured["user_content"])
-    assert set(payload.keys()) == {
+    assert payload.keys() >= {
         "session_arn",
         "investor_schema_guide_json",
         "question",
     }
+    assert "filter_catalog_json" not in payload
     assert payload["question"] == "Investor with Age between 30 and 40"
     assert "filter_catalog_json" not in payload
     guide_inner = json.loads(payload["investor_schema_guide_json"])
     assert guide_inner.get("contract_kind") == "investor_schema_guide"
-    assert guide_inner.get("table_count", 0) >= 14
+    assert guide_inner.get("table_count", 0) >= 1
+    if "selected_guide_modules" in payload:
+        assert isinstance(payload["selected_guide_modules"], list)

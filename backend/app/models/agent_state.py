@@ -16,26 +16,12 @@ STATE_KEY_INVESTOR_TAB = "investor_tab"
 STATE_KEY_LAST_MESSAGE = "last_user_message"
 STATE_KEY_NEEDS_CLARIFICATION = "needs_clarification"
 STATE_KEY_CLARIFICATION_QUESTION = "clarification_question"
-STATE_KEY_LAST_SEARCH_PLAN = "last_search_plan"
-STATE_KEY_LAST_NORMALIZED_QUERY = "last_normalized_query"
-STATE_KEY_PLAN_SOURCE = "plan_source"
-STATE_KEY_QUERY_ARGUMENTS = "query_arguments"
 STATE_KEY_FINAL_QUERY = "final_query"
 # Top-level copies of final_query.sql / parameters for ADK session UI visibility
 STATE_KEY_LAST_SQL = "last_sql"
 STATE_KEY_LAST_SQL_PARAMETERS = "last_sql_parameters"
-STATE_KEY_PLAN_QUERY = "plan_query"
-STATE_KEY_PLAN_VALIDATION_STATUS = "plan_validation_status"
-# Compact investor DB schema (live fetch via tool, or derived from packaged JSON)
-STATE_KEY_INVESTOR_SCHEMA_CONTRACT_COMPACT = "investor_schema_contract_compact"
-STATE_KEY_INVESTOR_SCHEMA_CONTRACT_META = "investor_schema_contract_meta"
-STATE_KEY_INVESTOR_SCHEMA_SESSION_FETCHED = "investor_schema_session_fetched"
-# Filter catalog JSON (``filters`` + metadata) materialized once per session for validation/SQL.
-STATE_KEY_FILTER_CATALOG_SNAPSHOT = "filter_catalog_snapshot"
-STATE_KEY_FILTER_CATALOG_SESSION_FETCHED = "filter_catalog_session_fetched"
-# Two-step query flow (small router LLM + large catalog SQL generator) — append-only trace + last payloads
+# Catalog SQL generator — append-only trace + last payload
 STATE_KEY_QUERY_FLOW_TRACE = "query_flow_trace"
-STATE_KEY_QUERY_FLOW_ROUTER_LAST = "query_flow_router_last"
 STATE_KEY_QUERY_GENERATOR_LAST = "catalog_query_generator_last"
 STATE_KEY_QUERY_FLOW_LAST_ROUTE = "query_flow_last_route"
 
@@ -114,25 +100,6 @@ class AgentToolOutput(StrictSchemaModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class IntentDetectionLLMOutput(StrictSchemaModel):
-    """Strict JSON contract returned by the detect-intent LLM classifier."""
-
-    current_intent: RoutingIntent
-    route: RoutingRoute
-    step: RoutingStep | None = Field(
-        default=None,
-        description=(
-            "Conversation step from the LLM. Some models omit this key; the backend "
-            "then derives step from ``current_intent`` before building ``RoutingState``."
-        ),
-    )
-    investor_tab: InvestorTab = InvestorTab.INDIVIDUAL
-    needs_clarification: bool = False
-    clarification_question: str | None = None
-    has_search_filters: bool = False
-    detected_filters: list[str] = Field(default_factory=list)
-
-
 class IntentDetectionOutput(StrictSchemaModel):
     status: Literal["ok"] = "ok"
     routing_state: RoutingState
@@ -140,44 +107,6 @@ class IntentDetectionOutput(StrictSchemaModel):
     has_search_filters: bool = False
     detected_filters: list[str] = Field(default_factory=list)
     detection_source: Literal["llm", "fallback", "individual_only"] = "llm"
-
-
-PlanValidationStatus = Literal["valid", "clarification", "out_of_scope"]
-
-
-class SearchArgumentsAnalysisOutput(StrictSchemaModel):
-    """Strict JSON from analyze_search_arguments_tool for the query engine."""
-
-    status: Literal["ok"] = "ok"
-    validation_status: PlanValidationStatus
-    can_execute: bool
-    normalized_query: str
-    plan_source: Literal["llm", "fallback"]
-    search_plan: dict[str, Any]
-    query_arguments: dict[str, Any]
-    filters_applied: list[str] = Field(default_factory=list)
-    message: str | None = None
-
-
-class InvestorSchemaFetchToolOutput(StrictSchemaModel):
-    """Result of fetch_investor_schema_contract_tool (live schema snapshot for session)."""
-
-    status: Literal["ok", "error"] = "ok"
-    source: str | None = None
-    message: str | None = None
-    table_count: int = 0
-    column_count: int = 0
-    session_state_keys_written: list[str] = Field(default_factory=list)
-
-
-class QueryFlowRouterToolOutput(StrictSchemaModel):
-    """Result of ``route_user_query_flow_tool`` (small LLM)."""
-
-    status: Literal["ok", "error"] = "ok"
-    route: Literal["greeting", "filter_search", "data_sql"]
-    reply: str
-    router_model: str = ""
-    error: str | None = None
 
 
 class GenerateCatalogSqlToolOutput(StrictSchemaModel):

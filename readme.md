@@ -4,12 +4,11 @@ Local/dev-first MVP for a mutual fund distributor **Individual investor** search
 
 The backend uses Google ADK for the agent and keeps SQL execution deterministic:
 
-- Individual investors: the backend **loads** `backend/app/data/filter_catalog.json` (or the default contract catalog), validates filter values against it, then builds **read-only warehouse SQL** (`WITH uuids AS …`) against `distributor_investor_mapping`, `investor`, and related tables.
-- Non-Individual investor search is **not** in this MVP (executor code kept for a later phase).
-- Optional **dynamic read-only SQL** (`DYNAMIC_INVESTOR_SQL_ENABLED=true`): a separate tool runs an LLM + ReAct loop (max three attempts) against the investor schema contract with static SQL guards and mandatory ARN binding. Prefer the filter search path for normal list queries.
+- Individual investors: **`generate_catalog_sql_query_tool`** loads modular schema guides from `backend/app/data/schema_guide_modules/`, calls a catalog SQL generator LLM, validates SQL, and executes read-only PostgreSQL against the warehouse (ARN-scoped).
+- Non-Individual investor search is **not** in this MVP.
 - Out of scope: pending investors, PAN/folio/mobile/email lookup, flexible duration phrases (unless enabled as above for contract-grounded reporting only).
 
-**Schema for the SearchPlan LLM:** On the **first** investor search / plan build in an ADK session, the backend **auto-fetches** live PostgreSQL column metadata (once), stores a compact copy in session, and **rewrites** `backend/app/data/investor_db_schema_contract.json`. Later turns skip DB introspection until the session ends. `fetch_investor_schema_contract_tool(force=true)` forces a refresh. During **pytest**, auto-fetch uses the packaged JSON only (no DB, no file write). Refresh the file manually anytime with `python app/data/export_investor_schema_contract.py` from `backend/`.
+**Schema for SQL generation:** Packaged `investor_db_schema_guide.json` and modular guides under `app/data/schema_guide_modules/`. Refresh contract JSON from Postgres with `PYTHONPATH=. python app/data/export_investor_schema_contract.py` from `backend/`.
 
 **Filter catalog without hitting the warehouse every session:** Run `PYTHONPATH=. python scripts/sync_filter_catalog_sqlite.py` from `backend/` (while connected to Postgres). By default it copies **all 14** investor-contract tables (`INVESTOR_CONTRACT_TABLES`) into SQLite as `public_*` / `sphmf_*` tables plus **6 views** so catalog merge SQL still works. Use `--mode catalog` for a quick **6-table** copy only. Set `FILTER_CATALOG_SQLITE_PATH=app/data/filter_catalog_local.sqlite` in `backend/.env`, **or** set `DEV_LOCAL_SQLITE_MIRROR` to the same path in **development** to also **skip live schema introspection** (packaged `investor_db_schema_contract.json` only) while still using `DEV_DATABASE_URL` for executing warehouse SQL. This mirror is **not** every table in the remote cluster—only the contract the app uses; for a full Postgres clone use `pg_dump` to a local Postgres instance.
 
@@ -23,7 +22,7 @@ The backend uses Google ADK for the agent and keeps SQL execution deterministic:
 
 **Offline local Postgres (Docker):** Clone dev once, then run the chatbot against **localhost:5433** without VPN. See [Local Docker PostgreSQL](#local-docker-postgresql) below.
 
-**Offline-ish Individual search (dev):** Run `PYTHONPATH=. python scripts/init_dev_sqlite_demo.py` to create `app/data/dev_investor_demo.sqlite` (one demo investor). Set `DEV_LOCAL_SQLITE_MIRROR=app/data/dev_investor_demo.sqlite`, `DEV_INVESTOR_SEARCH_USE_SQLITE=true`, and `APP_ENV=local`. Default Individual list queries then **execute on SQLite**; the SearchPlan LLM must still return an unfiltered plan (or you will see an error telling you to use Postgres). LLM calls still need cloud credentials. For real warehouse data, keep `DEV_INVESTOR_SEARCH_USE_SQLITE` off and use PostgreSQL.
+**Offline catalog mirror (dev):** Run `PYTHONPATH=. python scripts/init_dev_sqlite_demo.py` to create `app/data/dev_investor_demo.sqlite`. Set `DEV_LOCAL_SQLITE_MIRROR` to that path for catalog refresh without VPN Postgres. SQL execution still uses PostgreSQL unless you use local Docker Postgres.
 
 Use the virtualenv at **`backend/.venv`** only. Do **not** use a repo-root `.venv` (missing deps, wrong `app` imports).
 
@@ -47,12 +46,10 @@ Edit `backend/.env`:
 | `LOCAL_DATABASE_URL` | `postgresql://localdev:localdev@localhost:5433/investor_db_local` |
 | `DEV_DATABASE_URL` | Remote read-only URL (clone source; optional when local Docker is on) |
 | `DEFAULT_DEV_ARN` | `ARN-0411` |
-| `DYNAMIC_INVESTOR_SQL_ENABLED` | `false` (set `true` to expose ad-hoc read-only SQL tool) |
-| `DYNAMIC_SQL_LLM_MODEL` | optional legacy SQL override |
+| `DYNAMIC_SQL_LLM_MODEL` | optional catalog SQL generator override (LiteLLM) |
 | `BEDROCK_QUERY_GENERATOR_MODEL_ID` | large-context Bedrock model for `generate_catalog_sql_query_tool` (default Sonnet 3.5) |
 | `QUERY_GENERATOR_LLM_MODEL` | optional LiteLLM override for the catalog SQL generator |
 | `FILTER_CATALOG_SQLITE_PATH` | optional; SQLite file for catalog merge only |
-| `DEV_INVESTOR_SEARCH_USE_SQLITE` | optional (dev only); when `true` with `DEV_LOCAL_SQLITE_MIRROR`, default Individual **search results** read from SQLite (not Postgres) |
 | `LLM_PROVIDER` | `bedrock` |
 | `BEDROCK_MODEL_ID` | small/fast Bedrock model for the **root ADK agent** (default Haiku) |
 | `BEDROCK_ROOT_MODEL_ID` | optional root override (else `BEDROCK_MODEL_ID`) |
@@ -247,13 +244,13 @@ The LLM step can succeed while **PostgreSQL is down**. Investor rows come only f
 3. Restart uvicorn after `.env` changes.
 4. Run `./scripts/test_local_postgres_query.sh` to verify connectivity.
 
-Optional pipeline check (needs a running DB for row counts):
+Optional smoke test (server must be running on :8000):
 
 ```bash
 cd backend
 source .venv/bin/activate
 export PYTHONPATH=.
-python scripts/test_query_pipeline.py
+python scripts/verify_backend_queries.py
 ```
 
 ### API examples (optional)
@@ -289,15 +286,17 @@ When **`generate_catalog_sql_query_tool`** runs, it **writes** `final_query`, `l
 cd backend
 source .venv/bin/activate
 export PYTHONPATH=.
-pytest tests/test_example_queries_sql.py tests/test_example_queries_adk_state.py
+pytest
 ```
 
-These cover the product example NL strings (plan + SQL shape from `intent_parser` / executor tests, and ADK session `final_query` / `last_sql` for the **catalog SQL** tool). There is no separate integration test in-repo anymore; use `scripts/test_query_pipeline.py` against a live `DEV_DATABASE_URL` when you need DB-backed checks.
+Unit tests cover catalog SQL, schema guides, routing, and ADK session state. For live API checks with Postgres running:
 
 ```bash
-# Optional: pipeline script with real DB (requires DEV_DATABASE_URL)
-python scripts/test_query_pipeline.py
+python scripts/verify_backend_queries.py
+python scripts/verify_backend_queries.py --verbose
 ```
+
+See `backend/scripts/README.md` for all maintenance scripts.
 
 ### LLM calls per turn (current catalog SQL path)
 
@@ -420,6 +419,5 @@ Enable models in **Amazon Bedrock → Model access** for `AWS_REGION`, then rest
 | `AWS_REGION` | e.g. `ap-south-1` |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | Bedrock credentials |
 | `DEFAULT_PAGE_LIMIT` | Default page size (default `25`) |
-| `MAX_INTERSECTION_ROWS` | NI intersection cap (default `5000`; unused in Individual MVP) |
 | `AWS_PROFILE`, `AWS_ROLE_ARN`, `AWS_SECRETS_MANAGER_PREFIX` | Optional AWS deployment |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins |

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from copy import deepcopy
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -16,10 +15,6 @@ from app.services.catalog_sqlite import (
     SQLITE_CATALOG_FILTER_QUERIES,
     fetch_all_sqlite,
     is_sqlite_catalog_url,
-)
-from app.models.agent_state import (
-    STATE_KEY_FILTER_CATALOG_SESSION_FETCHED,
-    STATE_KEY_FILTER_CATALOG_SNAPSHOT,
 )
 from app.models.search_plan import (
     ActivityType,
@@ -140,43 +135,7 @@ def _merge_db_values(catalog: dict[str, Any], db_key: str, filter_key: str, rows
     }
 
 
-# Maps catalog filter_key -> SearchPlanLLMOutput JSON field name.
-SEARCH_PLAN_JSON_FIELDS: dict[str, str] = {
-    "investor_tab": "investor_tab",
-    "eligibility": "eligibility",
-    "individual_otm": "individual_otm",
-    "non_individual_otm": "non_individual_otm",
-    "investor_type": "investor_type",
-    "investor_subtypes": "investor_subtypes",
-    "city": "city",
-    "holding_mode": "holding_mode",
-    "systematic_mode": "systematic_mode",
-    "systematic_plans": "systematic_plans",
-    "activity_mode": "activity_mode",
-    "activity_types": "activity_types",
-    "activity_duration": "activity_duration",
-}
-
-# Filter keys surfaced in intent-detection (routing) prompts.
-INTENT_FILTER_KEYS: tuple[str, ...] = (
-    "investor_tab",
-    "eligibility",
-    "individual_otm",
-    "non_individual_otm",
-    "investor_type",
-    "investor_subtypes",
-    "city",
-    "holding_mode",
-    "systematic_mode",
-    "systematic_plans",
-    "activity_mode",
-    "activity_types",
-    "activity_duration",
-    "scheme_codes",
-)
-
-# Default cap for *optional* short previews (e.g. root-agent one-liners). Intent and
-# search-plan prompts pass max_items=None so the full catalog lists are not truncated.
+# Default cap for *optional* short previews (e.g. root-agent one-liners).
 _PROMPT_INLINE_LIMIT = 40
 
 # Hard cap for embedding the entire catalog JSON in a single system message (characters).
@@ -254,84 +213,6 @@ class FilterCatalog:
             param = entry.get("parameter", "")
             param_note = f" -> {param}" if param else ""
             lines.append(f"- {key}{param_note} ({source}): {preview}{suffix}")
-        return "\n".join(lines)
-
-    def prompt_search_plan_filter_values(self) -> str:
-        """Per-filter allowed values for the search-plan LLM (full lists, no truncation)."""
-
-        lines = ["## Allowed parameter values per filter (catalog)"]
-        for key, json_field in SEARCH_PLAN_JSON_FIELDS.items():
-            entry = self.get_entry(key)
-            parameter = entry.get("parameter", "")
-            param_note = f" (maps to JSON `{json_field}`" + (f", DB/engine: {parameter})" if parameter else ")")
-            if key == "scheme_codes":
-                count = len(self.get_values(key))
-                lines.append(
-                    f"- scheme_codes{param_note}: use \"ALL\" or a scheme code from catalog "
-                    f"({count} codes). Do not invent scheme codes."
-                )
-                continue
-            if key in {"systematic_plans", "activity_types", "investor_subtypes"}:
-                lines.append(
-                    f"- {key}{param_note}: [] or subset of {self.format_json_array_values(key, max_items=None)}"
-                )
-            else:
-                lines.append(f"- {key}{param_note}: {self.format_value_union(key)}")
-        extra_keys = sorted(
-            k for k in self._data.get("filters", {}) if k not in SEARCH_PLAN_JSON_FIELDS
-        )
-        if extra_keys:
-            lines.append("\n### Additional catalog dimensions (metadata / future JSON fields)")
-            for key in extra_keys:
-                entry = self.get_entry(key)
-                parameter = entry.get("parameter", "")
-                param_note = f" ({parameter})" if parameter else ""
-                vals = self.get_values(key)
-                if len(vals) > 200:
-                    lines.append(
-                        f"- {key}{param_note}: {len(vals)} values — see **Complete filter catalog (JSON)** below."
-                    )
-                else:
-                    lines.append(f"- {key}{param_note}: {self.format_values_list(key, max_items=None)}")
-        return "\n".join(lines)
-
-    def prompt_search_plan_json_schema(self) -> str:
-        """Return JSON schema fragment with unions from catalog."""
-
-        lines = ["Return JSON exactly (no extra keys). Allowed types per field:"]
-        lines.append("{")
-        for key, json_field in SEARCH_PLAN_JSON_FIELDS.items():
-            if key in {"systematic_plans", "activity_types", "investor_subtypes"}:
-                lines.append(f'  "{json_field}": array of catalog {key} values,')
-            elif key == "activity_duration":
-                lines.append(f'  "{json_field}": {self.format_value_union(key)},')
-            else:
-                lines.append(f'  "{json_field}": {self.format_value_union(key)},')
-        lines.append('  "normalized_query": string,')
-        lines.append('  "name_search": string or null,')
-        lines.append('  "age_min": integer (full years from public.investor.dob) or null,')
-        lines.append('  "age_max": integer (full years from public.investor.dob) or null,')
-        lines.append('  "unsupported_reasons": [string]')
-        lines.append("}")
-        return "\n".join(lines)
-
-    def prompt_intent_filter_reference(self) -> str:
-        """Filter dimensions for intent/routing LLM (full lists for known keys)."""
-
-        lines = ["## Recognized search filter dimensions (catalog keys)"]
-        for key in INTENT_FILTER_KEYS:
-            entry = self.get_entry(key)
-            parameter = entry.get("parameter", "")
-            param_note = f" ({parameter})" if parameter else ""
-            lines.append(f"- {key}{param_note}: {self.format_values_list(key, max_items=None)}")
-        extra = sorted(k for k in self._data.get("filters", {}) if k not in INTENT_FILTER_KEYS)
-        if extra:
-            lines.append("\n### Other catalog keys (see full JSON appendix for values)")
-            lines.append(", ".join(extra))
-        lines.append(
-            "\nWhen has_search_filters=true, detected_filters labels should reference "
-            "these catalog keys (e.g. eligibility=YES, systematic_plans=SIP)."
-        )
         return "\n".join(lines)
 
     def prompt_full_catalog_json(self, max_chars: int | None = None) -> str:
@@ -426,48 +307,10 @@ def refresh_catalog_from_db(
     return FilterCatalog(catalog)
 
 
-def clear_filter_catalog_session_cache(session_state: dict[str, Any]) -> None:
-    """Drop session-scoped filter catalog so the next search turn reloads from DB/file."""
-
-    session_state.pop(STATE_KEY_FILTER_CATALOG_SESSION_FETCHED, None)
-    session_state.pop(STATE_KEY_FILTER_CATALOG_SNAPSHOT, None)
-
-
-def ensure_filter_catalog_snapshot_for_session(
-    session_state: dict[str, Any],
-    database_url: str | None,
-) -> None:
-    """Once per session: merge filter catalog (DB + contract when URL set) and cache in state."""
-
-    if session_state.get(STATE_KEY_FILTER_CATALOG_SESSION_FETCHED):
-        return
-
-    if os.environ.get("PYTEST_CURRENT_TEST"):
-        catalog = load_catalog_from_file()
-        session_state[STATE_KEY_FILTER_CATALOG_SNAPSHOT] = catalog.to_dict()
-        session_state[STATE_KEY_FILTER_CATALOG_SESSION_FETCHED] = True
-        return
-
-    if database_url:
-        try:
-            catalog = refresh_catalog_from_db(database_url)
-        except Exception as exc:
-            logger.warning("Session filter catalog DB refresh failed; using JSON file: %s", exc)
-            catalog = load_catalog_from_file()
-    else:
-        catalog = load_catalog_from_file()
-
-    session_state[STATE_KEY_FILTER_CATALOG_SNAPSHOT] = catalog.to_dict()
-    session_state[STATE_KEY_FILTER_CATALOG_SESSION_FETCHED] = True
-
-
 def get_filter_catalog_for_session(session_state: dict[str, Any] | None) -> FilterCatalog:
-    """Prefer the session snapshot built by ``ensure_filter_catalog_snapshot_for_session``."""
+    """Return the packaged filter catalog (``session_state`` reserved for future use)."""
 
-    if session_state and session_state.get(STATE_KEY_FILTER_CATALOG_SESSION_FETCHED):
-        snap = session_state.get(STATE_KEY_FILTER_CATALOG_SNAPSHOT)
-        if isinstance(snap, dict) and isinstance(snap.get("filters"), dict):
-            return FilterCatalog(snap)
+    _ = session_state
     return get_filter_catalog()
 
 
@@ -489,8 +332,3 @@ def _write_catalog(catalog: dict[str, Any], output_path: Path | None) -> None:
 @lru_cache
 def get_filter_catalog() -> FilterCatalog:
     return load_catalog_from_file()
-
-
-def reload_filter_catalog() -> FilterCatalog:
-    get_filter_catalog.cache_clear()
-    return get_filter_catalog()

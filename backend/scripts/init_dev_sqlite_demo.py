@@ -10,10 +10,9 @@ Use with::
 
     APP_ENV=local
     DEV_LOCAL_SQLITE_MIRROR=app/data/dev_investor_demo.sqlite
-    DEV_INVESTOR_SEARCH_USE_SQLITE=true
 
-Optional: leave ``DEV_DATABASE_URL`` unset for fully offline catalog + search
-(LLM calls still need cloud credentials).
+Optional: set ``FILTER_CATALOG_SQLITE_PATH`` to the same file for catalog refresh.
+LLM calls still need cloud credentials; SQL execution uses PostgreSQL unless configured otherwise.
 """
 
 from __future__ import annotations
@@ -124,7 +123,6 @@ def main() -> int:
     print(f"Wrote {out}")
     print("Set in backend/.env (development):")
     print(f"  DEV_LOCAL_SQLITE_MIRROR=app/data/{out.name}")
-    print("  DEV_INVESTOR_SEARCH_USE_SQLITE=true")
     return 0
 
 

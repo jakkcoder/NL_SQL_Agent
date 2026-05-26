@@ -2,7 +2,7 @@
 
 Used by ``app.services.routing.classify_message`` to set ``has_search_filters`` on the
 routing state (e.g. for ``greeting_tool`` session bookkeeping). It does **not** parse NL
-into a ``SearchPlan`` and is unrelated to the catalog SQL generator.
+for lightweight routing hints; unrelated to the catalog SQL generator.
 """
 
 

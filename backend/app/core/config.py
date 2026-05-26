@@ -55,7 +55,6 @@ class DatabaseConfig(BaseModel):
 class SearchConfig(BaseModel):
     default_dev_arn: str
     default_page_limit: int
-    max_intersection_rows: int
 
 
 class SecurityConfig(BaseModel):
@@ -106,9 +105,6 @@ class AppConfig(BaseSettings):
 
     default_dev_arn: str = Field(default="ARN-0411", alias="DEFAULT_DEV_ARN")
     default_page_limit: int = Field(default=25, alias="DEFAULT_PAGE_LIMIT")
-    max_intersection_rows: int = Field(default=5000, alias="MAX_INTERSECTION_ROWS")
-
-    dynamic_investor_sql_enabled: bool = Field(default=False, alias="DYNAMIC_INVESTOR_SQL_ENABLED")
     dynamic_sql_llm_model: str | None = Field(default=None, alias="DYNAMIC_SQL_LLM_MODEL")
     router_llm_model: str | None = Field(default=None, alias="ROUTER_LLM_MODEL")
     query_generator_llm_model: str | None = Field(default=None, alias="QUERY_GENERATOR_LLM_MODEL")
@@ -224,7 +220,6 @@ class AppConfig(BaseSettings):
     filter_catalog_path: str | None = Field(default=None, alias="FILTER_CATALOG_PATH")
     filter_catalog_sqlite_path: str | None = Field(default=None, alias="FILTER_CATALOG_SQLITE_PATH")
     dev_local_sqlite_mirror: str | None = Field(default=None, alias="DEV_LOCAL_SQLITE_MIRROR")
-    dev_investor_search_use_sqlite: bool = Field(default=False, alias="DEV_INVESTOR_SEARCH_USE_SQLITE")
     adk_web_ui: bool | None = Field(default=None, alias="ADK_WEB_UI")
 
     allowed_origins: str = Field(
@@ -326,7 +321,6 @@ class AppConfig(BaseSettings):
         return SearchConfig(
             default_dev_arn=self.default_dev_arn,
             default_page_limit=self.default_page_limit,
-            max_intersection_rows=self.max_intersection_rows,
         )
 
     @property
@@ -415,16 +409,6 @@ class AppConfig(BaseSettings):
         if path.is_file():
             return f"sqlite:///{path.resolve()}"
         return None
-
-    @property
-    def dev_use_sqlite_investor_search(self) -> bool:
-        """Run default Individual list queries on the SQLite mirror (development only)."""
-
-        if not self.runtime.is_development:
-            return False
-        if not self.dev_investor_search_use_sqlite:
-            return False
-        return self.dev_local_sqlite_mirror_file_url is not None
 
     @property
     def filter_catalog_refresh_database_url(self) -> str | None:
